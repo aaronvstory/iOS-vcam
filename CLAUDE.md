@@ -56,11 +56,11 @@ curl http://localhost:1985/api/v1/versions
 
 ### Core Components
 
-1. **PowerShell Launcher (`iOS-VCAM-Launcher.ps1`)** - ~2150 lines
+1. **PowerShell Launcher (`iOS-VCAM-Launcher.ps1`)** - ~3200 lines
    - Network adapter detection with IP monitoring
    - Dynamic IP replacement via regex in configs
-   - Interactive menu with server status
-   - Process management for SRS and Flask
+   - Interactive menu with server status (options: A, B, 1, 3-9, C, Q)
+   - Process management for SRS/Monibuca and Flask
 
 2. **SRS Media Server (`objs/srs.exe`)**
    - RTMP: 1935, HTTP/HLS: 8080, API: 1985
@@ -78,10 +78,11 @@ curl http://localhost:1985/api/v1/versions
 |----------|------|---------|
 | `Get-NetworkInfo` | ~399 | WMI network detection |
 | `Update-SRSConfigForNewIP` | ~570 | IP placeholder replacement |
-| `Show-MainMenu` | ~605 | Interactive menu loop |
-| `Start-SRSServer` | ~1107 | Process lifecycle management |
-| `Invoke-DebrandedIOSBuild` | ~1319 | Calls Python debranding tools |
-| `Show-ConfigSelector` | ~1646 | Configuration profile picker |
+| `Show-MainMenu` | ~605 | Interactive menu display |
+| `Start-CombinedFlaskAndSRS` | ~740 | Main streaming launcher |
+| `Show-iOSDebCreator` | ~2300 | iOS .deb builder (option 8) |
+| `Show-ConfigSelector` | ~1550 | Configuration profile picker |
+| `Show-ConfigurationSettings` | ~2870 | Settings menu (option C) |
 
 ### Configuration System
 

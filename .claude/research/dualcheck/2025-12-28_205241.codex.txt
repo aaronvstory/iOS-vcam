@@ -1,0 +1,269 @@
+OpenAI Codex v0.77.0 (research preview)
+--------
+workdir: F:\claude\iOS-Vcam-server\iOS-VCAM-v4.2-Distribution
+model: gpt-5.2-codex
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: auto
+session id: 019b6875-66bc-7e20-8fae-eab7a5e305c5
+--------
+user
+Review this PowerShell cleanup diff. Functions removed: Show-EnhancedDebBuilder, Start-USBForwarderMode, Start-USBHotspotMode. Check for: orphaned references, logic issues, architectural consistency. Output JSON array in json block: [{severity, title, details, file, line, recommendation}]. Then brief summary.
+mcp: chromedevtools starting
+mcp: serena starting
+mcp: desktop-commander starting
+mcp: sequential-thinking starting
+mcp: subagents starting
+mcp: github starting
+mcp: exa starting
+mcp: exa ready
+mcp: github ready
+mcp: sequential-thinking ready
+mcp: chromedevtools ready
+mcp: desktop-commander ready
+mcp: serena ready
+mcp: subagents ready
+mcp startup: ready: exa, github, sequential-thinking, chromedevtools, desktop-commander, serena, subagents
+
+thinking
+**Locating file for diff**
+tool desktop-commander.list_directory({"path":"F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution","depth":2})
+desktop-commander.list_directory({"path":"F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution","depth":2}) success in 54ms:
+{
+  "content": [
+    {
+      "text": "[DIR] .claude\n[DIR] .claude\\research\n[DIR] .git\n[FILE] .git\\COMMIT_EDITMSG\n[FILE] .git\\config\n[FILE] .git\\description\n[FILE] .git\\HEAD\n[DIR] .git\\hooks\n[FILE] .git\\index\n[DIR] .git\\info\n[DIR] .git\\logs\n[DIR] .git\\objects\n[DIR] .git\\refs\n[FILE] .gitignore\n[DIR] .serena\n[FILE] .serena\\.gitignore\n[DIR] .serena\\cache\n[DIR] .serena\\memories\n[FILE] .serena\\project.yml\n[FILE] AGENTS.md\n[FILE] CLAUDE.md\n[FILE] compile-v4.2.ps1\n[DIR] conf\n[FILE] conf\\monibuca_iphone_balanced.yaml\n[FILE] conf\\monibuca_iphone_low_latency.yaml\n[FILE] conf\\monibuca_iphone_optimized.yaml\n[FILE] conf\\srs_default.conf\n[FILE] conf\\srs_iphone_max_smooth.conf\n[FILE] conf\\srs_iphone_motion_smooth.conf\n[FILE] conf\\srs_iphone_optimized_fixed.conf\n[FILE] conf\\srs_iphone_optimized_smooth.conf\n[FILE] conf\\srs_iphone_smooth_balanced.conf\n[FILE] conf\\srs_iphone_ultra_smooth.conf\n[FILE] conf\\srs_iphone_ultra_smooth_dynamic.conf\n[DIR] config\n[DIR] config\\active\n[DIR] config\\archived\n[FILE] config.ini\n[FILE] debug.log\n[DIR] docs\n[FILE] docs\\CRASH_FIX_COMPLETE.md\n[FILE] docs\\DEPLOYMENT_READY.md\n[FILE] docs\\HOW-WE-CONNECTED-IPHONE-FRIDA.md\n[FILE] docs\\RTMP-over-USB-on-iOS.txt\n[FILE] docs\\SSH-IPHONE-3UTOOLS.md\n[FILE] docs\\SSH_INSTALLATION_FEATURE.md\n[DIR] ios\n[FILE] ios\\change_maintainer.py\n[FILE] ios\\deb_packer.py\n[FILE] ios\\iosvcam_base.deb\n[FILE] ios\\ios_debrand_end_to_end.py\n[FILE] ios\\ios_deb_ip_changer_final.py\n[DIR] ios\\modified_debs\n[DIR] ios\\tools\n[FILE] ios\\validate_deb.py\n[DIR] ios\\__pycache__\n[FILE] iOS-VCAM-Launcher.bat\n[FILE] iOS-VCAM-Launcher.exe\n[FILE] iOS-VCAM-Launcher.ps1\n[FILE] iOS-VCAM.ico\n[FILE] LICENSE\n[FILE] m7s.db\n[DIR] objs\n[FILE] objs\\cyggcc_s-seh-1.dll\n[FILE] objs\\cygstdc++-6.dll\n[FILE] objs\\cygwin1.dll\n[FILE] objs\\monibuca.exe\n[DIR] objs\\nginx\n[FILE] objs\\srs.exe\n[FILE] objs\\srs.id\n[FILE] plink.exe\n[FILE] pscp.exe\n[FILE] README.md\n[DIR] scripts\n[FILE] scripts\\usb_tethering_monitor.py\n[FILE] scripts\\usb_usbmux_listener.py\n[FILE] server.py\n[FILE] shutdown.bat\n[DIR] tasks\n[FILE] tasks\\CLEANUP-remove-broken-code.md\n[FILE] tasks\\todo.md\n[FILE] tasks\\USB-SSH-STREAMING-GUIDE.md\n[DIR] tests\n[FILE] tests\\compile-ios-vcam-launcher.ps1\n[FILE] tests\\quick-test.ps1\n[FILE] tests\\test-exe-launch.ps1\n[FILE] tests\\test-launcher.ps1\n[FILE] tests\\verify_ios_setup.ps1",
+      "type": "text"
+    }
+  ]
+}
+
+thinking
+**Preparing to run git diff**
+tool desktop-commander.start_process({"command":"git -C F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution diff","timeout_ms":10000})
+desktop-commander.start_process({"command":"git -C F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution diff","timeout_ms":10000}) success in 2.26s:
+{
+  "content": [
+    {
+      "text": "Process started with PID 51932 (shell: powershell.exe)\nInitial output:\n",
+      "type": "text"
+    }
+  ]
+}
+
+thinking
+**Waiting for output**
+tool desktop-commander.read_process_output({"pid":51932,"timeout_ms":10000})
+desktop-commander.read_process_output({"pid":51932,"timeout_ms":10000}) success in 43ms:
+{
+  "content": [
+    {
+      "text": "[Reading 0 new lines (total: 0 lines)]\n\n(No output in requested range)\n✅ Process completed with exit code 0 (runtime: 2.25s)",
+      "type": "text"
+    }
+  ]
+}
+
+thinking
+**Searching for relevant diffs**
+tool desktop-commander.read_file({"path":"F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\tasks\\CLEANUP-remove-broken-code.md"})
+desktop-commander.read_file({"path":"F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\tasks\\CLEANUP-remove-broken-code.md"}) success in 103ms:
+{
+  "content": [
+    {
+      "text": "[Reading 114 lines from start (total: 115 lines, 1 remaining)]\n\n# Task: Remove Broken/Dead Code from iOS-VCAM Launcher\n\n## Objective\nRemove non-functional legacy code from `iOS-VCAM-Launcher.ps1` that was never completed. This is a cleanup task - no new functionality, just deletion.\n\n## Branch\n```bash\ngit checkout -b cleanup/remove-broken-usb-modes\n```\n\n## What to Remove\n\n### 1. Function: `Show-EnhancedDebBuilder` (BROKEN)\n- **Location:** Around line 1506-1600\n- **Menu option:** `[2] 📱 ENHANCED .DEB BUILDER`\n- **Why remove:** Failed experiment, never worked. The WORKING .deb builder is `[8] Show-iOSDebCreator` - keep that one.\n\n### 2. Function: `Start-USBForwarderMode` (BROKEN)  \n- **Location:** Around line 1771-2099\n- **Menu option:** `[U] 🔌 USB FORWARDER MODE`\n- **Why remove:** Incomplete implementation, requires iPhone-side tweak that doesn't exist.\n\n### 3. Function: `Start-USBHotspotMode` (BROKEN)\n- **Location:** Around line 2101-2250\n- **Menu option:** `[T] 📱 USB HOTSPOT MODE`\n- **Why remove:** Incomplete implementation, never worked properly.\n\n### 4. Menu Entries in `Show-MainMenu`\nRemove these menu display lines (search for the text):\n```\n[2] 📱 ENHANCED .DEB BUILDER\n[U] 🔌 USB FORWARDER MODE\n[T] 📱 USB HOTSPOT MODE\n```\n\n### 5. Switch Cases in Main Menu Loop\nAround line 3618-3640, remove these cases:\n```powershell\n\"2\" { Show-EnhancedDebBuilder }\n\"U\" { Start-USBForwarderMode }\n\"T\" { Start-USBHotspotMode }\n```\n\n---\n\n## What to KEEP (DO NOT TOUCH)\n\n| Option | Function | Status |\n|--------|----------|--------|\n| `[A]` | `Start-CombinedFlaskAndSRS` | ✅ WORKING - main streaming |\n| `[B]` | `Start-CombinedFlaskAndSRS-SRS` | ✅ WORKING - legacy SRS |\n| `[1]` | `Start-FlaskAuthServer` | ✅ WORKING |\n| `[3]` | `Show-ConfigSelector` | ✅ WORKING |\n| `[4]` | `Show-SystemDiagnostics` | ✅ WORKING |\n| `[5]` | Port cleanup | ✅ WORKING |\n| `[6]` | Network refresh | ✅ WORKING |\n| `[7]` | `Copy-RTMPUrlToClipboard` | ✅ WORKING |\n| `[8]` | `Show-iOSDebCreator` | ✅ WORKING - this is the GOOD .deb builder |\n| `[9]` | `Show-USBValidation` | ✅ KEEP (may be useful) |\n| `[C]` | `Show-ConfigurationSettings` | ✅ WORKING |\n| `[Q]` | Quit | ✅ WORKING |\n\n**Also keep these helper functions (used by working code):**\n- `Start-UsbListenerWindow` - helper function, may be reused later\n- `Resolve-ExecutablePath` - used everywhere\n- All network detection functions\n- All config management functions\n\n---\n\n## Step-by-Step Process\n\n1. **Read the file first** to understand current structure\n2. **Find and delete** the 3 broken functions (entire function blocks)\n3. **Find and delete** the menu entry lines in `Show-MainMenu`\n4. **Find and delete** the switch cases in the main menu loop\n5. **Verify** the script still runs: `powershell -ExecutionPolicy Bypass -File iOS-VCAM-Launcher.ps1`\n6. **Test** options [A], [8], [C] still work (quick smoke test)\n\n---\n\n## Verification Checklist\n\nAfter cleanup:\n- [ ] Script launches without errors\n- [ ] Menu displays correctly (no [2], [U], [T])\n- [ ] Option [A] still starts Monibuca streaming\n- [ ] Option [8] still opens .deb builder menu  \n- [ ] Option [C] still opens configuration settings\n- [ ] No orphaned references to deleted functions (search for function names)\n\n---\n\n## Commit\n\n```bash\ngit add iOS-VCAM-Launcher.ps1\ngit commit -m \"chore: remove broken USB modes and enhanced .deb builder\n\nRemove non-functional legacy code:\n- Show-EnhancedDebBuilder (failed experiment)\n- Start-USBForwarderMode (incomplete, never worked)\n- Start-USBHotspotMode (incomplete, never worked)\n\nWorking .deb builder remains at option [8] Show-iOSDebCreator.\nReduces file by ~600 lines of dead code.\"\n```\n\n---\n\n## Expected Result\n\nFile should go from ~3696 lines to ~3100 lines.\nMenu should show options: A, B, 1, 3-9, C, Q (no 2, U, T)",
+      "type": "text"
+    }
+  ]
+}
+
+thinking
+**Investigating missing diff for review**
+tool desktop-commander.start_process({"command":"rg -n \"Show-EnhancedDebBuilder|Start-USBForwarderMode|Start-USBHotspotMode\" F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\iOS-VCAM-Launcher.ps1","timeout_ms":10000})
+desktop-commander.start_process({"command":"rg -n \"Show-EnhancedDebBuilder|Start-USBForwarderMode|Start-USBHotspotMode\" F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\iOS-VCAM-Launcher.ps1","timeout_ms":10000}) success in 2.62s:
+{
+  "content": [
+    {
+      "text": "Process started with PID 41552 (shell: powershell.exe)\nInitial output:\n",
+      "type": "text"
+    }
+  ]
+}
+
+thinking
+**Reading output**
+tool desktop-commander.read_process_output({"pid":41552,"timeout_ms":10000})
+desktop-commander.read_process_output({"pid":41552,"timeout_ms":10000}) success in 51ms:
+{
+  "content": [
+    {
+      "text": "[Reading 0 new lines (total: 0 lines)]\n\n(No output in requested range)\n✅ Process completed with exit code 1 (runtime: 2.61s)",
+      "type": "text"
+    }
+  ]
+}
+
+thinking
+**Checking for menu option references**
+tool desktop-commander.start_process({"command":"rg -n \"ENHANCED \\.DEB BUILDER|USB FORWARDER MODE|USB HOTSPOT MODE\" F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\iOS-VCAM-Launcher.ps1","timeout_ms":10000})
+desktop-commander.start_process({"command":"rg -n \"ENHANCED \\.DEB BUILDER|USB FORWARDER MODE|USB HOTSPOT MODE\" F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\iOS-VCAM-Launcher.ps1","timeout_ms":10000}) success in 2.07s:
+{
+  "content": [
+    {
+      "text": "Process started with PID 76452 (shell: powershell.exe)\nInitial output:\n",
+      "type": "text"
+    }
+  ]
+}
+tool desktop-commander.read_process_output({"pid":76452,"timeout_ms":10000})
+desktop-commander.read_process_output({"pid":76452,"timeout_ms":10000}) success in 46ms:
+{
+  "content": [
+    {
+      "text": "[Reading 0 new lines (total: 0 lines)]\n\n(No output in requested range)\n✅ Process completed with exit code 1 (runtime: 2.06s)",
+      "type": "text"
+    }
+  ]
+}
+
+thinking
+**Reviewing menu script logic**
+tool desktop-commander.start_process({"command":"rg -n \"Show-MainMenu|Main Menu\" F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\iOS-VCAM-Launcher.ps1","timeout_ms":10000})
+desktop-commander.start_process({"command":"rg -n \"Show-MainMenu|Main Menu\" F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\iOS-VCAM-Launcher.ps1","timeout_ms":10000}) success in 2.09s:
+{
+  "content": [
+    {
+      "text": "Process started with PID 88472 (shell: powershell.exe)\nInitial output:\n605:function Show-MainMenu {\r\n3116:        Show-MainMenu\r\n",
+      "type": "text"
+    }
+  ]
+}
+
+thinking
+**Planning partial file reading**
+tool desktop-commander.read_file({"path":"F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\iOS-VCAM-Launcher.ps1","offset":560,"length":120})
+desktop-commander.read_file({"path":"F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\iOS-VCAM-Launcher.ps1","offset":560,"length":120}) success in 96ms:
+{
+  "content": [
+    {
+      "text": "[Reading 120 lines from line 560 (total: 3198 lines, 2518 remaining)]\n\n            Write-Host \"  ✅ Configuration updated successfully!\" -ForegroundColor Green\n            Write-Host \"  📱 New RTMP URL: rtmp://$script:CurrentIP`:1935/live/srs\" -ForegroundColor Green\n        } else {\n            Write-Host \"  ❌ Configuration update failed - manual update may be needed\" -ForegroundColor Red\n        }\n        Write-Host \"\"\n    }\n}\n\nfunction Update-SRSConfigForNewIP {\n    param(\n        [string]$OldIP,\n        [string]$NewIP\n    )\n\n    try {\n        # Update the ultimate auto config if it exists\n        $autoConfigPath = Join-Path $script:SRSHome \"config\\active\\srs_ultimate_auto.conf\"\n        if (Test-Path $autoConfigPath) {\n            $content = Get-Content $autoConfigPath -Raw\n            $content = $content -replace [regex]::Escape($OldIP), $NewIP\n            $content | Set-Content $autoConfigPath -Encoding UTF8\n            Write-Host \"    Updated: $autoConfigPath\" -ForegroundColor Cyan\n        }\n\n        # Update any other config files that might contain the old IP\n        $configPath = Join-Path $script:SRSHome \"config\\active\"\n        $configFiles = Get-ChildItem (Join-Path $configPath \"*.conf\") -ErrorAction SilentlyContinue | Where-Object { $_.Name -like \"*iphone*\" -or $_.Name -like \"*ultimate*\" }\n        foreach ($configFile in $configFiles) {\n            $content = Get-Content $configFile.FullName -Raw -ErrorAction SilentlyContinue\n            if ($content -and $content.Contains($OldIP)) {\n                $content = $content -replace [regex]::Escape($OldIP), $NewIP\n                $content | Set-Content $configFile.FullName -Encoding UTF8\n                Write-Host \"    Updated: $($configFile.Name)\" -ForegroundColor Cyan\n            }\n        }\n\n        return $true\n    } catch {\n        Write-Host \"    Error updating configs: $($_.Exception.Message)\" -ForegroundColor Red\n        return $false\n    }\n}\n\nfunction Show-MainMenu {\n    try { Clear-Host } catch { }\n    Show-SRSAsciiArt\n    Write-Host \"\"\n    Write-Host \"    \" -NoNewline\n    Write-Host \"iOS VCAM - perma unlock\" -ForegroundColor Yellow\n    Write-Host \"    \" -NoNewline\n    Write-Host \"═══════════════════════════════════════════════════════════════════════════════════════════\" -ForegroundColor DarkGray\n    Write-Host \"\"\n    Write-Host \"    \" -NoNewline\n    Write-Host \"╔═══════════════════════════════════════════════════════════════════════════════════════╗\" -ForegroundColor Cyan\n    Write-Host \"    \" -NoNewline\n    Write-Host \"║\" -NoNewline -ForegroundColor Cyan\n    $systemStatusLabel = \"                                 📊 SYSTEM STATUS                                      \"\n    Write-Host $systemStatusLabel -NoNewline -BackgroundColor DarkCyan -ForegroundColor White\n    Write-Host \"║\" -ForegroundColor Cyan\n    Write-Host \"    \" -NoNewline\n    Write-Host \"╚═══════════════════════════════════════════════════════════════════════════════════════╝\" -ForegroundColor Cyan\n\n    Write-Host \"\"\n    Write-Host \"  🌐 Wi-Fi IP Address: $script:CurrentIP\" -ForegroundColor White\n    Write-Host \"  📡 Network Adapter: $script:WiFiAdapter\" -ForegroundColor White\n    Write-Host \"  🔗 Connection Status: $script:NetworkStatus\" -ForegroundColor White\n    Write-Host \"  📁 SRS Directory: $script:SRSHome\" -ForegroundColor White\n    Write-Host \"  📱 RTMP URL: rtmp://$script:CurrentIP`:1935/live/srs\" -ForegroundColor Green\n\n    # Read config to determine which engine is active\n    $config = Read-Config\n    $isMonibuca = ($config.StreamingServer -ne \"srs\")\n    $monibucaProfile = $config.MonibucaConfig\n    if ([string]::IsNullOrWhiteSpace($monibucaProfile)) {\n        $monibucaProfile = \"monibuca_iphone_optimized.yaml\"\n    }\n\n    # Display currently selected config/profile\n    Write-Host \"\"\n    if ($isMonibuca) {\n        $profileDisplayName = $monibucaProfile -replace \"\\.ya?ml$\", \"\"\n        Write-Host \"  ⚙️  Active Profile: \" -NoNewline -ForegroundColor White\n        Write-Host \"$profileDisplayName\" -ForegroundColor Magenta\n    } elseif ($script:SelectedConfig) {\n        $configDisplayName = $script:SelectedConfig -replace \"\\.conf$\", \"\"\n        Write-Host \"  ⚙️  Active Config: \" -NoNewline -ForegroundColor White\n        Write-Host \"$configDisplayName\" -ForegroundColor Magenta\n    } else {\n        Write-Host \"  ⚙️  Active Config: \" -NoNewline -ForegroundColor White\n        Write-Host \"srs_iphone_ultra_smooth_dynamic (default)\" -ForegroundColor Gray\n    }\n    Write-Host \"\"\n    Write-Host \"\"\n    Write-Host \"    \" -NoNewline\n    Write-Host \"─────────────────────────────────────────────────────────────────────────────────────────\" -ForegroundColor Yellow\n    Write-Host \"    💡 Copy this RTMP URL to your iPhone app:\" -ForegroundColor Yellow\n    Write-Host \"    \" -NoNewline\n    Write-Host \"    rtmp://$script:CurrentIP`:1935/live/srs\" -ForegroundColor Cyan\n    Write-Host \"    \" -NoNewline\n    Write-Host \"─────────────────────────────────────────────────────────────────────────────────────────\" -ForegroundColor Yellow\n    Write-Host \"\"\n    Write-Host \"    \" -NoNewline\n    Write-Host \"╔═══════════════════════════════════════════════════════════════════════════════════════╗\" -ForegroundColor Green\n    Write-Host \"    \" -NoNewline\n    Write-Host \"║\" -NoNewline -ForegroundColor Green\n    $launchOptionsLabel = \"                                🎮 LAUNCH OPTIONS                                      \"\n    Write-Host $launchOptionsLabel -NoNewline -BackgroundColor DarkGreen -ForegroundColor Black\n    Write-Host \"║\" -ForegroundColor Green\n    Write-Host \"    \" -NoNewline\n    Write-Host \"╚═══════════════════════════════════════════════════════════════════════════════════════╝\" -ForegroundColor Green\n    Write-Host \"\"\n\n    if ($isMonibuca) {\n        Write-Host \"  [A] 🚀 MONIBUCA STREAMING SERVER (Default)\" -ForegroundColor Magenta\n        Write-Host \"      • Modern, low-latency media server\" -ForegroundColor Gray\n        Write-Host \"      • Optimized for iPhone WiFi streaming\" -ForegroundColor Gray\n        Write-Host \"      • Uses config: $monibucaProfile\" -ForegroundColor Gray\n    } else {\n        Write-Host \"  [A] 🚀 SRS STREAMING SERVER (Active)\" -ForegroundColor Cyan",
+      "type": "text"
+    }
+  ]
+}
+
+thinking
+**Scrolling to find menu options**
+tool desktop-commander.read_file({"path":"F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\iOS-VCAM-Launcher.ps1","offset":680,"length":200})
+desktop-commander.read_file({"path":"F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\iOS-VCAM-Launcher.ps1","offset":680,"length":200}) success in 106ms:
+{
+  "content": [
+    {
+      "text": "[Reading 200 lines from line 680 (total: 3198 lines, 2318 remaining)]\n\n        if ($script:SelectedConfig) {\n            $configDisplayName = $script:SelectedConfig -replace \"\\.conf$\", \"\"\n            Write-Host \"      • Uses config: $configDisplayName\" -ForegroundColor Magenta\n        } else {\n            Write-Host \"      • Uses default: srs_iphone_ultra_smooth_dynamic\" -ForegroundColor Gray\n        }\n    }\n    Write-Host \"      • Launches Flask auth + streaming server\" -ForegroundColor Gray\n    Write-Host \"      • Streaming runs in new window with live logs\" -ForegroundColor Gray\n    Write-Host \"\"\n\n    if ($isMonibuca) {\n        Write-Host \"  [B] 📺 SRS STREAMING SERVER (Legacy/Fallback)\" -ForegroundColor Cyan\n        Write-Host \"      • Original SRS-based streaming\" -ForegroundColor Gray\n        Write-Host \"      • Use if Monibuca has issues\" -ForegroundColor Gray\n    } else {\n        Write-Host \"  [B] 📺 SRS DIRECT (Bypass Dispatcher)\" -ForegroundColor DarkCyan\n        Write-Host \"      • Directly launches SRS (same as [A] when SRS is active)\" -ForegroundColor Gray\n        Write-Host \"      • Tip: Use [A] for normal streaming\" -ForegroundColor DarkGray\n    }\n    Write-Host \"\"\n\n    Write-Host \"  [1] 🔐 FLASK AUTHENTICATION SERVER (Standalone)\" -ForegroundColor White\n    Write-Host \"      • Handles iOS app authentication/validation\" -ForegroundColor Gray\n    Write-Host \"      • Auto-installs Flask if needed\" -ForegroundColor Gray\n    Write-Host \"      • Uses detected IP: $script:CurrentIP\" -ForegroundColor Gray\n    Write-Host \"\"\n    if ($isMonibuca) {\n        Write-Host \"  [3] ⚙️  SELECT/CHANGE MONIBUCA PROFILE\" -ForegroundColor White\n        Write-Host \"      • Choose Monibuca profile to use with Option [A]\" -ForegroundColor Gray\n    } else {\n        Write-Host \"  [3] ⚙️  SELECT/CHANGE SRS CONFIG (iPhone Optimized)\" -ForegroundColor White\n        Write-Host \"      • Choose SRS config to use with Option [A]\" -ForegroundColor Gray\n        Write-Host \"      • View config properties & compare settings\" -ForegroundColor Gray\n    }\n    Write-Host \"\"\n    Write-Host \"    \" -NoNewline\n    Write-Host \"╔═══════════════════════════════════════════════════════════════════════════════════════╗\" -ForegroundColor Magenta\n    Write-Host \"    \" -NoNewline\n    Write-Host \"║                                🔧 SYSTEM TOOLS                                        ║\" -ForegroundColor Magenta\n    Write-Host \"    \" -NoNewline\n    Write-Host \"╚═══════════════════════════════════════════════════════════════════════════════════════╝\" -ForegroundColor Magenta\n    Write-Host \"\"\n    Write-Host \"  [4] 🔍 SYSTEM DIAGNOSTICS\" -ForegroundColor White\n    Write-Host \"  [5] 🧹 PORT CLEANUP\" -ForegroundColor White\n    Write-Host \"  [6] 🔄 REFRESH NETWORK DETECTION\" -ForegroundColor White\n    Write-Host \"  [7] 📋 COPY RTMP URL TO CLIPBOARD\" -ForegroundColor White\n    Write-Host \"  [8] 📱 CREATE iOS .DEB WITH CUSTOM IP\" -ForegroundColor White\n    Write-Host \"  [9] 🧪 USB SETUP VALIDATION\" -ForegroundColor White\n    Write-Host \"\"\n    Write-Host \"  [C] ⚙️  CONFIGURATION SETTINGS\" -ForegroundColor White\n    Write-Host \"  [Q] 🚪 QUIT\" -ForegroundColor White\n    Write-Host \"\"\n    Write-Host \"    \" -NoNewline\n    Write-Host \"╚═══════════════════════════════════════════════════════════════════════════════════════╝\" -ForegroundColor DarkGray\n    Write-Host \"\"\n}\n\nfunction Start-CombinedFlaskAndSRS {\n    # Check which streaming server to use\n    $config = Read-Config\n\n    if ($config.StreamingServer -eq \"srs\") {\n        # Use SRS (legacy mode)\n        Start-CombinedFlaskAndSRS-SRS\n        return\n    }\n\n    # Default: Use Monibuca (new default)\n    Start-CombinedFlaskAndMonibuca\n}\n\n# SRS Version (Legacy) - Renamed from original Start-CombinedFlaskAndSRS\nfunction Start-CombinedFlaskAndSRS-SRS {\n    try { Clear-Host } catch { }\n    Write-Host \"\"\n    Write-Host \"    =====================================================================================\" -ForegroundColor Cyan\n    Write-Host \"                      🚀 COMBINED FLASK + SRS STREAMING SOLUTION (Legacy)             \" -ForegroundColor White\n    Write-Host \"    =====================================================================================\" -ForegroundColor Cyan\n    Write-Host \"\"\n\n    Write-Host \"[INFO] Starting SRS streaming solution (legacy mode)...\" -ForegroundColor Green\n    Write-Host \"\"\n\n    # Check if Python is installed for Flask\n    Write-Host \"`[STEP 1/5] 🐍 Checking Python installation...\" -ForegroundColor Yellow\n    $pythonVersion = $null\n    try {\n        $pythonVersion = & python --version 2>&1\n        if ($pythonVersion -match \"Python (\\d+\\.\\d+)\") {\n            Write-Host \"  ✅ Python is installed: $pythonVersion\" -ForegroundColor Green\n        }\n    } catch { }\n\n    if (-not $pythonVersion) {\n        Write-Host \"  ❌ Python is not installed or not in PATH!\" -ForegroundColor Red\n        Write-Host \"\"\n        Write-Host \"  Please install Python from: https://www.python.org/downloads/\" -ForegroundColor Yellow\n        Write-Host \"  Make sure to check 'Add Python to PATH' during installation.\" -ForegroundColor Yellow\n        Write-Host \"\"\n        Read-Host \"Press Enter to return to menu...\"\"\"\n        return\n    }\n\n    # Check Flask installation\n    Write-Host \"`[STEP 2/5`] 📦 Checking Flask installation...\" -ForegroundColor Yellow\n    $flaskInstalled = $false\n    try {\n        & python -c \"import flask\" 2>&1 | Out-Null\n        if ($LASTEXITCODE -eq 0) {\n            $flaskInstalled = $true\n            Write-Host \"  ✅ Flask is installed\" -ForegroundColor Green\n        }\n    } catch { }\n\n    if (-not $flaskInstalled) {\n        Write-Host \"  📦 Flask not found. Installing Flask...\" -ForegroundColor Yellow\n        & python -m pip install flask 2>&1 | Out-Null\n        if ($LASTEXITCODE -eq 0) {\n            Write-Host \"  ✅ Flask installed successfully!\" -ForegroundColor Green\n        } else {\n            Write-Host \"  ❌ Failed to install Flask. Please install manually.\" -ForegroundColor Red\n            Read-Host \"Press Enter to return to menu...\"\"\"\n            return\n        }\n    }\n\n    # Clean up ports\n    Write-Host \"`[STEP 3/5] 🧹 Cleaning up conflicting processes...\" -ForegroundColor Yellow\n    Clear-SRSPorts\n\n    # Start SRS in new window\n    Write-Host \"`[STEP 4/5] 🚀 Launching SRS server in new window...\" -ForegroundColor Yellow\n\n    # LOG: Write config check to file for debugging\n    $timestamp = Get-Date -Format \"yyyy-MM-dd HH:mm:ss\"\n    $logMsg = @\"\n[$timestamp] START-COMBINED-FLASK-AND-SRS - Config Check\n  - SelectedConfig = '$script:SelectedConfig'\n  - SelectedConfigPath = '$script:SelectedConfigPath'\n  - Path exists = $(if ($script:SelectedConfigPath) { Test-Path $script:SelectedConfigPath } else { 'N/A' })\n\"@\n    Add-Content -Path $script:LogFile -Value $logMsg -Force\n\n    Write-Host \"\"\n    Write-Host \"  [DEBUG] Config check logged to: $script:LogFile\" -ForegroundColor Yellow\n    Write-Host \"\"\n\n    # Get config path - use selected config if set, otherwise use default\n    if ($script:SelectedConfig -and $script:SelectedConfigPath) {\n        # Verify the path exists\n        if (Test-Path $script:SelectedConfigPath) {\n            $configPath = $script:SelectedConfigPath\n            $configName = $script:SelectedConfig -replace \"\\.conf$\", \"\"\n            Write-Host \"  📄 Using selected config: $configName\" -ForegroundColor Cyan\n        } else {\n            # Path stored but doesn't exist - try to rebuild it\n            $rebuildPath = Join-Path $script:SRSHome \"config\\active\\$($script:SelectedConfig)\"\n            if (Test-Path $rebuildPath) {\n                $configPath = $rebuildPath\n                $script:SelectedConfigPath = $rebuildPath\n                $configName = $script:SelectedConfig -replace \"\\.conf$\", \"\"\n                Write-Host \"  📄 Using selected config (rebuilt path): $configName\" -ForegroundColor Cyan\n            } else {\n                Write-Host \"  ⚠️ Selected config not found, using default\" -ForegroundColor Yellow\n                $configPath = Join-Path $script:SRSHome \"config\\active\\srs_iphone_ultra_smooth_dynamic.conf\"\n            }\n        }\n    } else {\n        $configPath = Join-Path $script:SRSHome \"config\\active\\srs_iphone_ultra_smooth_dynamic.conf\"\n        if (-not (Test-Path $configPath)) {\n            $configPath = Join-Path $script:SRSHome \"config\\active\\srs_iphone_ultra_smooth.conf\"\n        }\n        Write-Host \"  📄 Using default config: srs_iphone_ultra_smooth_dynamic\" -ForegroundColor Gray\n    }\n\n    # LOG: Final config path decision\n    $timestamp = Get-Date -Format \"yyyy-MM-dd HH:mm:ss\"\n    $logMsg = @\"\n[$timestamp] FINAL CONFIG PATH DECISION\n  - configPath = '$configPath'\n  - configPath exists = $(Test-Path $configPath)\n  - Config file basename = $(Split-Path $configPath -Leaf)\n\"@\n    Add-Content -Path $script:LogFile -Value $logMsg -Force\n\n    # Update IP in config\n    if (Update-ConfigIP $configPath) {\n        Write-Host \"  ✅ IP configuration updated to: $script:CurrentIP\" -ForegroundColor Green\n    }\n\n    # Create command for new window\n    $srsPath = Join-Path $script:SRSHome \"objs\\srs.exe\"\n    $configFullPath = (Resolve-Path $configPath).Path\n\n    # Launch SRS in new PowerShell window with colored output\n    $psCommand = @\"\n`$Host.UI.RawUI.WindowTitle = 'SRS Media Server - Live Logs';\nWrite-Host '========================================' -ForegroundColor Cyan;\nWrite-Host '       SRS MEDIA SERVER - LIVE LOGS    ' -ForegroundColor White;",
+      "type": "text"
+    }
+  ]
+}
+
+thinking
+**Checking switch cases for removed options**
+tool desktop-commander.read_file({"path":"F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\iOS-VCAM-Launcher.ps1","offset":3080,"length":160})
+desktop-commander.read_file({"path":"F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\iOS-VCAM-Launcher.ps1","offset":3080,"length":160}) success in 115ms:
+{
+  "content": [
+    {
+      "text": "[Reading 117 lines from line 3080 (total: 3198 lines, 1 remaining)]\n\n        $selectedAdapter = Show-NetworkAdapterSelection\n        if ($selectedAdapter) {\n            $config.PreferredAdapter = $selectedAdapter.Name\n            $config.PreferredIP = $selectedAdapter.IP\n            $config.AutoDetectNetwork = \"false\"\n            $config.FirstLaunchCompleted = \"true\"\n            Write-Config $config\n\n            try { Clear-Host } catch { }\n            Show-SRSAsciiArt\n            Write-Host \"\"\n            Write-Host \"    \" -NoNewline\n            Write-Host \"╔═══════════════════════════════════════════════════════════════════════════════════════╗\" -ForegroundColor Green\n            Write-Host \"    \" -NoNewline\n            Write-Host \"║                                ✅ SETUP COMPLETE!                                     ║\" -BackgroundColor DarkGreen -ForegroundColor White\n            Write-Host \"    \" -NoNewline\n            Write-Host \"╚═══════════════════════════════════════════════════════════════════════════════════════╝\" -ForegroundColor Green\n            Write-Host \"\"\n            Write-Host \"  🎉 Network adapter configured successfully!\" -ForegroundColor Green\n            Write-Host \"  📡 Selected: $($selectedAdapter.Name)\" -ForegroundColor Cyan\n            Write-Host \"  🌐 IP Address: $($selectedAdapter.IP)\" -ForegroundColor Cyan\n            Write-Host \"\"\n            Write-Host \"  🚀 SRS Launcher is now ready to use!\" -ForegroundColor White\n            Write-Host \"\"\n            Read-Host \"Press Enter to continue to main menu\"\n        } else {\n            $config.FirstLaunchCompleted = \"true\"\n            $config.AutoDetectNetwork = \"true\"\n            Write-Config $config\n        }\n    }\n\n    Get-NetworkInfo\n\n    do {\n        Show-MainMenu\n        $choice = Read-Host \"Choose option [A, B, 1, 3-9, C, Q]\"\n\n        if ([string]::IsNullOrEmpty($choice)) {\n            $choice = \"Q\"\n        }\n\n        try {\n            switch ($choice.ToUpper()) {\n                \"A\" { Start-CombinedFlaskAndSRS }\n                \"B\" { Start-CombinedFlaskAndSRS-SRS }  # Legacy SRS mode (direct, bypasses engine check)\n                \"1\" { Start-FlaskAuthServer }\n                \"3\" { Show-ConfigSelector }\n                \"4\" { Show-SystemDiagnostics }\n                \"5\" {\n                    Write-Host \"Cleaning up ports...\" -ForegroundColor Yellow\n                    Clear-SRSPorts\n                    Read-Host \"Press Enter to continue\"\n                }\n                \"6\" { Get-NetworkInfo; Read-Host \"Network detection refreshed. Press Enter to continue\" }\n                \"7\" { Copy-RTMPUrlToClipboard }\n                \"8\" { Show-iOSDebCreator }\n                \"9\" { Show-USBValidation }\n                \"C\" { Show-ConfigurationSettings }\n                \"Q\" {\n                    Write-Host \"\"\n                    Write-Host \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\" -ForegroundColor Green\n                    Write-Host \"                     🎉 Thank you for using SRS Ultimate Launcher!                      \" -BackgroundColor DarkGreen -ForegroundColor White\n                    Write-Host \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\" -ForegroundColor Green\n                    Write-Host \"\"\n                    exit 0\n                }\n                default {\n                    Write-Host \"\"\n                    Write-Host \"  ❌ Invalid choice '$choice'. Please select a valid option.\" -ForegroundColor Red\n                    Write-Host \"\"\n                    Start-Sleep -Seconds 2\n                }\n            }\n        } catch {\n            Write-Host \"\"\n            Write-Host \"  ⚠️ Error executing menu option '$choice':\" -ForegroundColor Yellow\n            Write-Host \"  $($_.Exception.Message)\" -ForegroundColor Red\n            Write-Host \"\"\n            Write-Host \"  💡 Try selecting a different option or restart the launcher.\" -ForegroundColor Cyan\n            Write-Host \"\"\n            Read-Host \"Press Enter to continue\"\n        }\n    } while ($true)\n\n} catch {\n    Write-CrashLog \"CRITICAL ERROR\" $_\n    try { Clear-Host } catch { }\n    Show-SRSAsciiArt\n    Write-Host \"\"\n    Write-Host \"    ╔═══════════════════════════════════════════════════════════════════════════════════════╗\" -ForegroundColor Red\n    Write-Host \"    ║                                ❌ CRITICAL ERROR                                       ║\" -BackgroundColor DarkRed -ForegroundColor White\n    Write-Host \"    ╚═══════════════════════════════════════════════════════════════════════════════════════╝\" -ForegroundColor Red\n    Write-Host \"\"\n    Write-Host \"  🚨 An unexpected error occurred in the SRS Launcher:\" -ForegroundColor Red\n    Write-Host \"\"\n    Write-Host \"  📝 Error Details:\" -ForegroundColor Yellow\n    Write-Host \"     $($_.Exception.Message)\" -ForegroundColor White\n    Write-Host \"\"\n    Write-Host \"  🧾 Crash log: $script:CrashLog\" -ForegroundColor Yellow\n    Write-Host \"\"\n    Write-Host \"  💡 Troubleshooting Tips:\" -ForegroundColor Cyan\n    Write-Host \"     • Try running the launcher as Administrator\" -ForegroundColor White\n    Write-Host \"     • Ensure all SRS files are in the correct directory\" -ForegroundColor White\n    Write-Host \"     • Check that no antivirus is blocking the launcher\" -ForegroundColor White\n    Write-Host \"     • Verify PowerShell execution policy allows scripts\" -ForegroundColor White\n    Write-Host \"\"\n    Write-Host \"  🔧 Quick Fix Commands:\" -ForegroundColor Cyan\n    Write-Host \"     PowerShell execution policy: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser\" -ForegroundColor Gray\n    Write-Host \"\"\n    Write-Host \"  📧 If the problem persists, report this error with the details above.\" -ForegroundColor Yellow\n    Write-Host \"\"\n    Write-Host \"    ╚═══════════════════════════════════════════════════════════════════════════════════════╝\" -ForegroundColor DarkGray\n    Write-Host \"\"\n    Read-Host \"Press Enter to exit\"\n    exit 1\n}",
+      "type": "text"
+    }
+  ]
+}
+
+thinking
+**Searching for function references**
+tool desktop-commander.start_process({"command":"rg -n \"Show-EnhancedDebBuilder|Start-USBForwarderMode|Start-USBHotspotMode\" F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution","timeout_ms":10000})
+desktop-commander.start_process({"command":"rg -n \"Show-EnhancedDebBuilder|Start-USBForwarderMode|Start-USBHotspotMode\" F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution","timeout_ms":10000}) success in 2.17s:
+{
+  "content": [
+    {
+      "text": "Process started with PID 77764 (shell: powershell.exe)\nInitial output:\n",
+      "type": "text"
+    }
+  ]
+}
+tool desktop-commander.read_process_output({"pid":77764,"timeout_ms":10000})
+desktop-commander.read_process_output({"pid":77764,"timeout_ms":10000}) success in 53ms:
+{
+  "content": [
+    {
+      "text": "[Reading 0 new lines (total: 0 lines)]\n\n(No output in requested range)\n✅ Process completed with exit code 1 (runtime: 2.16s)",
+      "type": "text"
+    }
+  ]
+}
+
+thinking
+**Verifying removal impact and references**
+tool desktop-commander.start_process({"command":"rg -n \"ENHANCED \\.DEB BUILDER|USB FORWARDER MODE|USB HOTSPOT MODE|Show-EnhancedDebBuilder|Start-USBForwarderMode|Start-USBHotspotMode\" F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution","timeout_ms":10000})
+desktop-commander.start_process({"command":"rg -n \"ENHANCED \\.DEB BUILDER|USB FORWARDER MODE|USB HOTSPOT MODE|Show-EnhancedDebBuilder|Start-USBForwarderMode|Start-USBHotspotMode\" F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution","timeout_ms":10000}) success in 2.07s:
+{
+  "content": [
+    {
+      "text": "Process started with PID 33952 (shell: powershell.exe)\nInitial output:\n",
+      "type": "text"
+    }
+  ]
+}
+tool desktop-commander.read_process_output({"pid":33952,"timeout_ms":10000})
+desktop-commander.read_process_output({"pid":33952,"timeout_ms":10000}) success in 42ms:
+{
+  "content": [
+    {
+      "text": "[Reading 0 new lines (total: 0 lines)]\n\n(No output in requested range)\n✅ Process completed with exit code 1 (runtime: 2.06s)",
+      "type": "text"
+    }
+  ]
+}
+
+thinking
+**Checking test references to menu options**
+tool desktop-commander.start_process({"command":"rg -n \"Choose option\" F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution","timeout_ms":10000})
+desktop-commander.start_process({"command":"rg -n \"Choose option\" F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution","timeout_ms":10000}) success in 2.15s:
+{
+  "content": [
+    {
+      "text": "Process started with PID 64036 (shell: powershell.exe)\nInitial output:\nF:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\iOS-VCAM-Launcher.ps1:2949:        $choice = Read-Host \"Choose option [1-4, B]\"\r\nF:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\iOS-VCAM-Launcher.ps1:3117:        $choice = Read-Host \"Choose option [A, B, 1, 3-9, C, Q]\"\r\n",
+      "type": "text"
+    }
+  ]
+}
+
+thinking
+**Checking related menu references**
+tool desktop-commander.read_file({"path":"F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\iOS-VCAM-Launcher.ps1","offset":2880,"length":120})
+desktop-commander.read_file({"path":"F:\\claude\\iOS-Vcam-server\\iOS-VCAM-v4.2-Distribution\\iOS-VCAM-Launcher.ps1","offset":2880,"length":120}) success in 118ms:
+{
+  "content": [
+    {
+      "text": "[Reading 120 lines from line 2880 (total: 3198 lines, 198 remaining)]\n\n    Write-Host \"║                             ⚙️  CONFIGURATION SETTINGS                                ║\" -BackgroundColor DarkBlue -ForegroundColor White\n    Write-Host \"    \" -NoNewline\n    Write-Host \"╚═══════════════════════════════════════════════════════════════════════════════════════╝\" -ForegroundColor Blue\n    Write-Host \"\"\n\n    $config = Read-Config\n\n    Write-Host \"  📊 Current Configuration:\" -ForegroundColor Green\n    Write-Host \"\"\n    Write-Host \"  🌐 Preferred Adapter: \" -NoNewline -ForegroundColor White\n    if ($config.PreferredAdapter -ne \"\") {\n        Write-Host \"$($config.PreferredAdapter)\" -ForegroundColor Cyan\n    } else {\n        Write-Host \"Auto-detect\" -ForegroundColor Yellow\n    }\n\n    Write-Host \"  📍 Preferred IP: \" -NoNewline -ForegroundColor White\n    if ($config.PreferredIP -ne \"\") {\n        Write-Host \"$($config.PreferredIP)\" -ForegroundColor Cyan\n    } else {\n        Write-Host \"Auto-detect\" -ForegroundColor Yellow\n    }\n\n    Write-Host \"  🔄 Auto Network Detection: \" -NoNewline -ForegroundColor White\n    if ($config.AutoDetectNetwork -eq \"true\") {\n        Write-Host \"Enabled\" -ForegroundColor Green\n    } else {\n        Write-Host \"Disabled\" -ForegroundColor Red\n    }\n\n    Write-Host \"  📁 Last Used Config: \" -NoNewline -ForegroundColor White\n    Write-Host \"$($config.LastUsedConfig)\" -ForegroundColor Cyan\n\n    Write-Host \"  📺 Streaming Server: \" -NoNewline -ForegroundColor White\n    if ($config.StreamingServer -eq \"srs\") {\n        Write-Host \"SRS (Legacy)\" -ForegroundColor Cyan\n    } else {\n        Write-Host \"MONIBUCA (Default)\" -ForegroundColor Magenta\n    }\n    Write-Host \"\"\n\n    Write-Host \"    \" -NoNewline\n    Write-Host \"╔═══════════════════════════════════════════════════════════════════════════════════════╗\" -ForegroundColor Green\n    Write-Host \"    \" -NoNewline\n    Write-Host \"║                                🔧 CONFIGURATION OPTIONS                               ║\" -BackgroundColor DarkGreen -ForegroundColor White\n    Write-Host \"    \" -NoNewline\n    Write-Host \"╚═══════════════════════════════════════════════════════════════════════════════════════╝\" -ForegroundColor Green\n    Write-Host \"\"\n\n    Write-Host \"  [1] 🌐 SELECT NETWORK ADAPTER\" -ForegroundColor White\n    Write-Host \"      • Choose your preferred network adapter\" -ForegroundColor Gray\n    Write-Host \"\"\n    Write-Host \"  [2] 🔄 TOGGLE AUTO-DETECTION\" -ForegroundColor White\n    Write-Host \"      • Enable/disable automatic network detection\" -ForegroundColor Gray\n    Write-Host \"\"\n    Write-Host \"  [3] 🧹 RESET TO DEFAULTS\" -ForegroundColor White\n    Write-Host \"      • Clear all saved preferences\" -ForegroundColor Gray\n    Write-Host \"\"\n    Write-Host \"  [4] 📺 STREAMING SERVER ENGINE\" -ForegroundColor White\n    Write-Host \"      • Switch between Monibuca and SRS\" -ForegroundColor Gray\n    Write-Host \"\"\n    Write-Host \"  [B] ← BACK TO MAIN MENU\" -ForegroundColor White\n    Write-Host \"\"\n    Write-Host \"    \" -NoNewline\n    Write-Host \"╚═══════════════════════════════════════════════════════════════════════════════════════╝\" -ForegroundColor DarkGray\n    Write-Host \"\"\n\n    do {\n        $choice = Read-Host \"Choose option [1-4, B]\"\n\n        switch ($choice.ToUpper()) {\n            \"1\" {\n                $selectedAdapter = Show-NetworkAdapterSelection\n                if ($selectedAdapter) {\n                    $config.PreferredAdapter = $selectedAdapter.Name\n                    $config.PreferredIP = $selectedAdapter.IP\n                    $config.AutoDetectNetwork = \"false\"\n                    Write-Config $config\n\n                    # Update current session\n                    $script:WiFiAdapter = $selectedAdapter.Name\n                    $script:CurrentIP = $selectedAdapter.IP\n                    $script:NetworkStatus = \"Connected ($($selectedAdapter.Name))\"\n\n                    Write-Host \"\"\n                    Write-Host \"  ✅ Network adapter preference saved!\" -ForegroundColor Green\n                    Read-Host \"Press Enter to continue\"\n                }\n                return Show-ConfigurationSettings\n            }\n            \"2\" {\n                if ($config.AutoDetectNetwork -eq \"true\") {\n                    $config.AutoDetectNetwork = \"false\"\n                    Write-Host \"\"\n                    Write-Host \"  🔒 Auto-detection disabled. Using preferred adapter.\" -ForegroundColor Yellow\n                } else {\n                    $config.AutoDetectNetwork = \"true\"\n                    Write-Host \"\"\n                    Write-Host \"  🔄 Auto-detection enabled. Will scan for network adapter.\" -ForegroundColor Green\n                }\n                Write-Config $config\n                Read-Host \"Press Enter to continue\"\n                return Show-ConfigurationSettings\n            }\n            \"3\" {\n                Write-Host \"\"\n                Write-Host \"  ⚠️  This will reset all configuration settings to defaults.\" -ForegroundColor Yellow\n                $confirm = Read-Host \"Are you sure? [Y/N]\"\n                if ($confirm.ToUpper() -eq \"Y\") {\n                    if (Test-Path $script:ConfigFile) {\n                        Remove-Item $script:ConfigFile\n                    }\n                    Write-Host \"  ✅ Configuration reset to defaults!\" -ForegroundColor Green\n                    Read-Host \"Press Enter to continue\"\n                    return\n                }\n                return Show-ConfigurationSettings\n            }\n            \"4\" {\n                Write-Host \"\"",
+      "type": "text"
+    }
+  ]
+}
+
+thinking
+**Reviewing PowerShell cleanup for orphaned references**
+codex
+```json
+[]
+```
+
+No git diff was present in the repo, but the current `iOS-VCAM-Launcher.ps1` shows no remaining references or menu entries for those removed functions, and the main menu/switch logic stays consistent with the updated option list.
+tokens used
+37,888
+```json
+[]
+```
+
+No git diff was present in the repo, but the current `iOS-VCAM-Launcher.ps1` shows no remaining references or menu entries for those removed functions, and the main menu/switch logic stays consistent with the updated option list.
