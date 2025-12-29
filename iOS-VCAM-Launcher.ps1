@@ -185,7 +185,7 @@ function Write-Log {
     if (Test-Path $script:LogFile) {
         $fileInfo = Get-Item $script:LogFile
         if ($fileInfo.Length -gt $script:MaxLogSize) {
-            $archiveFile = Join-Path $script:ConfigDir "srs-launcher.old.log"
+            $archiveFile = Join-Path $script:ConfigDir "iosvcam-launcher.old.log"
             Move-Item -Path $script:LogFile -Destination $archiveFile -Force
         }
     }
@@ -608,7 +608,7 @@ function Show-MainMenu {
     Show-SRSAsciiArt
     Write-Host ""
     Write-Host "    " -NoNewline
-    Write-Host "iOS VCAM - perma unlock" -ForegroundColor Yellow
+    Write-Host "iOS-VCAM Server v4.2 - Streaming Toolkit" -ForegroundColor Yellow
     Write-Host "    " -NoNewline
     Write-Host "═══════════════════════════════════════════════════════════════════════════════════════════" -ForegroundColor DarkGray
     Write-Host ""
@@ -775,7 +775,7 @@ function Start-CombinedFlaskAndSRS-SRS {
     Write-Host ""
 
     # Check if Python is installed for Flask
-    Write-Host "`[STEP 1/5] 🐍 Checking Python installation..." -ForegroundColor Yellow
+    Write-Host "[STEP 1/5] 🐍 Checking Python installation..." -ForegroundColor Yellow
     $pythonVersion = $null
     try {
         $pythonVersion = & python --version 2>&1
@@ -795,7 +795,7 @@ function Start-CombinedFlaskAndSRS-SRS {
     }
 
     # Check Flask installation
-    Write-Host "`[STEP 2/5`] 📦 Checking Flask installation..." -ForegroundColor Yellow
+    Write-Host "[STEP 2/5`] 📦 Checking Flask installation..." -ForegroundColor Yellow
     $flaskInstalled = $false
     try {
         & python -c "import flask" 2>&1 | Out-Null
@@ -818,11 +818,11 @@ function Start-CombinedFlaskAndSRS-SRS {
     }
 
     # Clean up ports
-    Write-Host "`[STEP 3/5] 🧹 Cleaning up conflicting processes..." -ForegroundColor Yellow
+    Write-Host "[STEP 3/5] 🧹 Cleaning up conflicting processes..." -ForegroundColor Yellow
     Clear-SRSPorts
 
     # Start SRS in new window
-    Write-Host "`[STEP 4/5] 🚀 Launching SRS server in new window..." -ForegroundColor Yellow
+    Write-Host "[STEP 4/5] 🚀 Launching SRS server in new window..." -ForegroundColor Yellow
 
     # LOG: Write config check to file for debugging
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -911,7 +911,7 @@ Write-Host 'SRS Server stopped. Press any key to close...' -ForegroundColor Yell
     Start-Sleep -Seconds 2
 
     # Start Flask in a new window by default
-    Write-Host "`[STEP 5/5] 🔐 Starting Flask authentication server..." -ForegroundColor Yellow
+    Write-Host "[STEP 5/5] 🔐 Starting Flask authentication server..." -ForegroundColor Yellow
     Write-Host ""
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
     Write-Host "                     ✅ BOTH SERVERS ARE NOW RUNNING!                          " -ForegroundColor Green
@@ -1047,7 +1047,7 @@ function Start-FlaskAuthServer {
     Write-Host ""
 
     # Check if Python is installed
-    Write-Host "`[STEP 1/4] 🐍 Checking Python installation..." -ForegroundColor Yellow
+    Write-Host "[STEP 1/4] 🐍 Checking Python installation..." -ForegroundColor Yellow
     $pythonVersion = $null
     try {
         $pythonVersion = & python --version 2>&1
@@ -1067,7 +1067,7 @@ function Start-FlaskAuthServer {
     }
 
     # Check if Flask is installed
-    Write-Host "`[STEP 2/4] 📦 Checking Flask installation..." -ForegroundColor Yellow
+    Write-Host "[STEP 2/4] 📦 Checking Flask installation..." -ForegroundColor Yellow
     $flaskInstalled = $false
     try {
         & python -c "import flask" 2>&1 | Out-Null
@@ -1099,8 +1099,8 @@ function Start-FlaskAuthServer {
         }
     }
 
-    Write-Host "`[STEP 3/4] 🌐 Configuring server with IP: $script:CurrentIP" -ForegroundColor Yellow
-    Write-Host "`[STEP 4/4] 🚀 Starting Flask server..." -ForegroundColor Yellow
+    Write-Host "[STEP 3/4] 🌐 Configuring server with IP: $script:CurrentIP" -ForegroundColor Yellow
+    Write-Host "[STEP 4/4] 🚀 Starting Flask server..." -ForegroundColor Yellow
     Write-Host ""
     Write-Host "    -------------------------------------------------------------------------------------" -ForegroundColor Green
     Write-Host "  📱 Flask Server URL: http://$script:CurrentIP`:80" -ForegroundColor Green
@@ -1437,7 +1437,7 @@ function Start-MonibucaViaSshUsb {
         5. iPhone IP alias - Routes 127.10.10.10 to loopback
 
         iPhone app connects to rtmp://127.10.10.10:1935/live/srs which tunnels back to PC.
-        HTTP auth at http://127.10.10.10/I also tunnels back to Flask on PC.
+        HTTP auth at http://127.10.10.10/ also tunnels back to Flask on PC.
     #>
     try { Clear-Host } catch { Write-Host "Note: Could not clear console" -ForegroundColor Gray }
     Write-Host ""
@@ -2353,10 +2353,10 @@ function Start-iPhoneUltraSmooth {
     Write-Host "[INFO] Launching iPhone Ultra-Smooth Dynamic mode" -ForegroundColor Cyan
     Write-Host ""
 
-    Write-Host "`[STEP 1/4] 🧹 Cleaning up conflicting processes..." -ForegroundColor Yellow
+    Write-Host "[STEP 1/4] 🧹 Cleaning up conflicting processes..." -ForegroundColor Yellow
     Clear-SRSPorts
 
-    Write-Host "`[STEP 2/4] ⚙️  Using ultra-smooth dynamic configuration..." -ForegroundColor Yellow
+    Write-Host "[STEP 2/4] ⚙️  Using ultra-smooth dynamic configuration..." -ForegroundColor Yellow
     $configPath = Join-Path $script:SRSHome "config\active\srs_iphone_ultra_smooth_dynamic.conf"
 
     # Check if config exists, fallback to regular ultra smooth
@@ -2365,14 +2365,14 @@ function Start-iPhoneUltraSmooth {
         Write-Host "  Using fallback config: $configPath" -ForegroundColor Yellow
     }
 
-    Write-Host "`[STEP 3/4] 🔧 Auto-updating IP addresses..." -ForegroundColor Yellow
+    Write-Host "[STEP 3/4] 🔧 Auto-updating IP addresses..." -ForegroundColor Yellow
     if (Update-ConfigIP $configPath) {
         Write-Host "  ✅ IP configuration updated to: $script:CurrentIP" -ForegroundColor Green
     } else {
         Write-Host "  ⚠️ Using existing IP configuration" -ForegroundColor Yellow
     }
 
-    Write-Host "`[STEP 4/4] 🚀 Starting SRS server..." -ForegroundColor Yellow
+    Write-Host "[STEP 4/4] 🚀 Starting SRS server..." -ForegroundColor Yellow
     Write-Host ""
     Write-Host "    -------------------------------------------------------------------------------------" -ForegroundColor Green
     Write-Host "  📱 RTMP URL: rtmp://$script:CurrentIP`:1935/live/srs" -ForegroundColor Green
@@ -3614,7 +3614,7 @@ function Test-ConfigWithIPFix($configInfo) {
     Write-Host ""
 
     # Check if config has correct IP
-    Write-Host "`[STEP 1/4] 🔍 Checking IP configuration..." -ForegroundColor Yellow
+    Write-Host "[STEP 1/4] 🔍 Checking IP configuration..." -ForegroundColor Yellow
     $configNeedsUpdate = Test-ConfigIPUpdate $configInfo.FullPath
 
     if ($configNeedsUpdate) {
@@ -3631,13 +3631,13 @@ function Test-ConfigWithIPFix($configInfo) {
     }
 
     Write-Host ""
-    Write-Host "`[STEP 2/4] 🧹 Cleaning up ports..." -ForegroundColor Yellow
+    Write-Host "[STEP 2/4] 🧹 Cleaning up ports..." -ForegroundColor Yellow
     Clear-SRSPorts
 
-    Write-Host "`[STEP 3/4] 📋 Configuration summary..." -ForegroundColor Yellow
+    Write-Host "[STEP 3/4] 📋 Configuration summary..." -ForegroundColor Yellow
     Show-ConfigSummary $configInfo.FullPath
 
-    Write-Host "`[STEP 4/4] 🚀 Starting SRS server..." -ForegroundColor Yellow
+    Write-Host "[STEP 4/4] 🚀 Starting SRS server..." -ForegroundColor Yellow
     Write-Host ""
 
     Start-SRSServer $configInfo.FullPath
@@ -3896,7 +3896,7 @@ function Show-ConfigurationSettings {
 
 # Main execution
 try {
-    Write-Log "=== SRS Launcher Started ==="
+    Write-Log "=== iOS-VCAM Launcher Started ==="
     Write-Log "PowerShell Version: $($PSVersionTable.PSVersion)"
     Write-Log "Operating System: $([System.Environment]::OSVersion.VersionString)"
 
@@ -3920,11 +3920,11 @@ try {
         Write-Host "    " -NoNewline
         Write-Host "╔═══════════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Green
         Write-Host "    " -NoNewline
-        Write-Host "║                               🎉 WELCOME TO SRS LAUNCHER!                             ║" -BackgroundColor DarkGreen -ForegroundColor White
+        Write-Host "║                            🎉 WELCOME TO iOS-VCAM LAUNCHER!                            ║" -BackgroundColor DarkGreen -ForegroundColor White
         Write-Host "    " -NoNewline
         Write-Host "╚═══════════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Green
         Write-Host ""
-        Write-Host "  🎯 This appears to be your first time running SRS Launcher!" -ForegroundColor Cyan
+        Write-Host "  🎯 This appears to be your first time running iOS-VCAM Launcher!" -ForegroundColor Cyan
         Write-Host "  📡 Let's configure your preferred network adapter for optimal streaming." -ForegroundColor White
         Write-Host ""
         Write-Host "  💡 You can change these settings anytime from the Configuration menu." -ForegroundColor Yellow
@@ -3953,7 +3953,7 @@ try {
             Write-Host "  📡 Selected: $($selectedAdapter.Name)" -ForegroundColor Cyan
             Write-Host "  🌐 IP Address: $($selectedAdapter.IP)" -ForegroundColor Cyan
             Write-Host ""
-            Write-Host "  🚀 SRS Launcher is now ready to use!" -ForegroundColor White
+            Write-Host "  🚀 iOS-VCAM Launcher is now ready to use!" -ForegroundColor White
             Write-Host ""
             Read-Host "Press Enter to continue to main menu"
         } else {
@@ -3994,7 +3994,7 @@ try {
                 "Q" {
                     Write-Host ""
                     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
-                    Write-Host "                     🎉 Thank you for using SRS Ultimate Launcher!                      " -BackgroundColor DarkGreen -ForegroundColor White
+                    Write-Host "                       🎉 Thank you for using iOS-VCAM Launcher!                        " -BackgroundColor DarkGreen -ForegroundColor White
                     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
                     Write-Host ""
                     exit 0
@@ -4026,7 +4026,7 @@ try {
     Write-Host "    ║                                ❌ CRITICAL ERROR                                       ║" -BackgroundColor DarkRed -ForegroundColor White
     Write-Host "    ╚═══════════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Red
     Write-Host ""
-    Write-Host "  🚨 An unexpected error occurred in the SRS Launcher:" -ForegroundColor Red
+    Write-Host "  🚨 An unexpected error occurred in the iOS-VCAM Launcher:" -ForegroundColor Red
     Write-Host ""
     Write-Host "  📝 Error Details:" -ForegroundColor Yellow
     Write-Host "     $($_.Exception.Message)" -ForegroundColor White
