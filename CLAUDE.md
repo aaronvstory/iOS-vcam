@@ -56,7 +56,7 @@ curl http://localhost:1985/api/v1/versions
 
 ### Core Components
 
-1. **PowerShell Launcher (`iOS-VCAM-Launcher.ps1`)** - ~3200 lines
+1. **PowerShell Launcher (`iOS-VCAM-Launcher.ps1`)** - ~3550 lines
    - Network adapter detection with IP monitoring
    - Dynamic IP replacement via regex in configs
    - Interactive menu with server status (options: A, B, 1, 3-9, U, C, Q)
@@ -80,10 +80,10 @@ curl http://localhost:1985/api/v1/versions
 | `Update-SRSConfigForNewIP` | ~570 | IP placeholder replacement |
 | `Show-MainMenu` | ~605 | Interactive menu display |
 | `Start-CombinedFlaskAndSRS` | ~740 | Main streaming launcher |
-| `Start-MonibucaViaSshUsb` | ~1311 | USB streaming via SSH tunnel (option U) |
-| `Show-iOSDebCreator` | ~2300 | iOS .deb builder (option 8) |
-| `Show-ConfigSelector` | ~1550 | Configuration profile picker |
-| `Show-ConfigurationSettings` | ~2870 | Settings menu (option C) |
+| `Start-MonibucaViaSshUsb` | ~1312 | USB streaming via SSH tunnel (option U) |
+| `Show-ConfigSelector` | ~1880 | Configuration profile picker |
+| `Show-iOSDebCreator` | ~2630 | iOS .deb builder (option 8) |
+| `Show-ConfigurationSettings` | ~3200 | Settings menu (option C) |
 
 ### Configuration System
 

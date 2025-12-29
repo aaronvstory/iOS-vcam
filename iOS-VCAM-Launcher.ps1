@@ -1318,12 +1318,15 @@ function Start-MonibucaViaSshUsb {
         to enable RTMP streaming from iPhone to PC over USB cable without WiFi.
         iPhone app connects to rtmp://127.10.10.10:1935/live/srs which tunnels back to PC.
     #>
-    try { Clear-Host } catch { }
+    try { Clear-Host } catch { Write-Host "Note: Could not clear console" -ForegroundColor Gray }
     Write-Host ""
     Write-Host "    =====================================================================================" -ForegroundColor Magenta
     Write-Host "                      🔌 USB STREAMING VIA SSH REVERSE TUNNEL                           " -ForegroundColor White
     Write-Host "    =====================================================================================" -ForegroundColor Magenta
     Write-Host ""
+
+    # Track verification results for conditional READY banner
+    $allReady = $true
 
     Write-Host "[INFO] Preparing USB streaming with SSH tunnel..." -ForegroundColor Green
     Write-Host ""
@@ -1331,7 +1334,7 @@ function Start-MonibucaViaSshUsb {
     # ============================================================================
     # STEP 1: Check Prerequisites
     # ============================================================================
-    Write-Host "[STEP 1/5] 🔍 Checking prerequisites..." -ForegroundColor Yellow
+    Write-Host "[STEP 1/7] 🔍 Checking prerequisites..." -ForegroundColor Yellow
 
     # Check for iproxy.exe
     $iproxyPath = "C:\iProxy\iproxy.exe"
@@ -1391,13 +1394,22 @@ function Start-MonibucaViaSshUsb {
     # ============================================================================
     # STEP 2: Detect iPhone via USB
     # ============================================================================
-    Write-Host "[STEP 2/5] 📱 Detecting iPhone via USB..." -ForegroundColor Yellow
+    Write-Host "[STEP 2/7] 📱 Detecting iPhone via USB..." -ForegroundColor Yellow
 
     $udidOutput = $null
+    $ideviceError = $null
     try {
         $udidOutput = & $ideviceIdPath -l 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            $ideviceError = "Exit code: $LASTEXITCODE"
+            $udidOutput = $null
+        }
     } catch {
+        $ideviceError = $_.Exception.Message
         $udidOutput = $null
+    }
+    if ($ideviceError) {
+        Write-Host "  [DEBUG] idevice_id error: $ideviceError" -ForegroundColor Gray
     }
 
     if ([string]::IsNullOrWhiteSpace($udidOutput) -or $udidOutput -match "error|ERROR") {
@@ -1428,7 +1440,8 @@ function Start-MonibucaViaSshUsb {
 
     Write-Host ""
     Write-Host "  📝 SSH Password Configuration" -ForegroundColor Cyan
-    Write-Host "     Current saved password: $savedPassword" -ForegroundColor Gray
+    $maskedPw = if ($savedPassword.Length -gt 0) { $savedPassword[0] + ("*" * ($savedPassword.Length - 1)) } else { "(none)" }
+    Write-Host "     Current saved password: $maskedPw" -ForegroundColor Gray
     Write-Host "     (Default for jailbroken devices is 'alpine')" -ForegroundColor Gray
     Write-Host ""
     $passwordInput = Read-Host "     Enter SSH password (or press Enter to use saved)"
@@ -1442,6 +1455,7 @@ function Start-MonibucaViaSshUsb {
         $config.SSHPassword = $sshPassword
         Write-Config $config
         Write-Host "  ✅ Password updated and saved for future sessions" -ForegroundColor Green
+        Write-Host "  ℹ️  Note: Password is stored in config.ini (plaintext)" -ForegroundColor DarkGray
     }
     Write-Host ""
 
@@ -1453,19 +1467,26 @@ function Start-MonibucaViaSshUsb {
 
     # Also clean up port 2222 (used for USB SSH forwarding)
     try {
-        $conn2222 = Get-NetTCPConnection -LocalPort 2222 -ErrorAction SilentlyContinue
-        if ($conn2222) {
-            foreach ($c in $conn2222) {
-                $pname = (Get-Process -Id $c.OwningProcess -ErrorAction SilentlyContinue).ProcessName
-                Write-Host "  🔥 Stopping '$pname' on port 2222 (PID: $($c.OwningProcess))" -ForegroundColor Red
-                Stop-Process -Id $c.OwningProcess -Force -ErrorAction SilentlyContinue
+        $conn2222 = Get-NetTCPConnection -LocalPort 2222 -ErrorAction Stop
+        foreach ($c in $conn2222) {
+            $pname = (Get-Process -Id $c.OwningProcess -ErrorAction SilentlyContinue)?.ProcessName ?? "(unknown)"
+            Write-Host "  🔥 Stopping '$pname' on port 2222 (PID: $($c.OwningProcess))" -ForegroundColor Red
+            try {
+                Stop-Process -Id $c.OwningProcess -Force -ErrorAction Stop
+            } catch {
+                Write-Host "  ⚠️ Could not stop PID $($c.OwningProcess): $_" -ForegroundColor Yellow
             }
-            Start-Sleep -Seconds 1
-        } else {
-            Write-Host "  ℹ️ Port 2222 is already free" -ForegroundColor Gray
         }
+        Start-Sleep -Seconds 1
+    } catch [Microsoft.PowerShell.Cmdlets.GetNetTCPConnectionCommand+NoMatchingConnectionException] {
+        Write-Host "  ℹ️ Port 2222 is already free" -ForegroundColor Gray
     } catch {
-        Write-Host "  ⚠️ Could not check port 2222" -ForegroundColor Yellow
+        # Fallback for when no connections found (different error types on different Windows versions)
+        if ($_.Exception.Message -match "No matching") {
+            Write-Host "  ℹ️ Port 2222 is already free" -ForegroundColor Gray
+        } else {
+            Write-Host "  ⚠️ Could not check port 2222: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
     }
     Write-Host ""
 
@@ -1531,15 +1552,21 @@ Write-Host 'iProxy stopped. Press any key to close...' -ForegroundColor Yellow;
 "@
 
     Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $iproxyCommand -WindowStyle Normal
-    Start-Sleep -Seconds 2
 
-    # Verify iproxy is listening on port 2222
-    $iproxyCheck = Get-NetTCPConnection -LocalPort 2222 -ErrorAction SilentlyContinue
+    # Verify iproxy is listening on port 2222 (polling with timeout)
+    $timeout = 10
+    $startTime = Get-Date
+    $iproxyCheck = $null
+    do {
+        Start-Sleep -Milliseconds 500
+        $iproxyCheck = Get-NetTCPConnection -LocalPort 2222 -ErrorAction SilentlyContinue
+    } while (-not $iproxyCheck -and ((Get-Date) - $startTime).TotalSeconds -lt $timeout)
+
     if ($iproxyCheck) {
-        Write-Host "  ✅ iproxy launched and listening on port 2222" -ForegroundColor Green
+        Write-Host "  ✅ iproxy listening on port 2222" -ForegroundColor Green
     } else {
-        Write-Host "  ⚠️ iproxy launched but port 2222 not yet listening" -ForegroundColor Yellow
-        Write-Host "     Check the Cyan iproxy window for errors" -ForegroundColor Gray
+        Write-Host "  ⚠️ iproxy not listening after ${timeout}s - check Cyan window" -ForegroundColor Yellow
+        $allReady = $false
     }
 
     # --- Launch SSH reverse tunnel (remote port 1935 -> localhost:1935) ---
@@ -1566,12 +1593,23 @@ Write-Host 'SSH tunnel closed. Press any key to close...' -ForegroundColor Yello
 "@
 
     Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $sshCommand -WindowStyle Normal
-    Write-Host "  ✅ SSH tunnel launched (reverse tunnel 1935 -> localhost:1935)" -ForegroundColor Green
+
+    # Verify SSH tunnel process started
+    Start-Sleep -Seconds 3
+    $plinkRunning = Get-Process -Name "plink" -ErrorAction SilentlyContinue
+    if ($plinkRunning) {
+        Write-Host "  ✅ SSH tunnel process started" -ForegroundColor Green
+        Write-Host "     Check yellow window for connection status" -ForegroundColor Gray
+    } else {
+        Write-Host "  ⚠️ SSH tunnel process may have exited" -ForegroundColor Yellow
+        Write-Host "     Check yellow window for errors" -ForegroundColor Gray
+        $allReady = $false
+    }
     Write-Host ""
     Write-Host "  ⚠️  FIRST TIME: Accept SSH host key (type 'y') in the yellow window" -ForegroundColor Yellow
     Write-Host "      Password auto-provided from saved config" -ForegroundColor Gray
+    Write-Host "      (Tip: Use -batch flag to fail immediately on unknown host)" -ForegroundColor DarkGray
     Write-Host ""
-    Start-Sleep -Seconds 3
 
     # --- Launch Monibuca ---
     Write-Host "  [3/3] Starting Monibuca server..." -ForegroundColor Cyan
@@ -1598,15 +1636,21 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
 "@
 
     Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $monibucaCommand -WindowStyle Normal
-    Start-Sleep -Seconds 3
 
-    # Verify Monibuca is listening on port 1935
-    $monibucaCheck = Get-NetTCPConnection -LocalPort 1935 -ErrorAction SilentlyContinue
+    # Verify Monibuca is listening on port 1935 (polling with timeout)
+    $timeout = 10
+    $startTime = Get-Date
+    $monibucaCheck = $null
+    do {
+        Start-Sleep -Milliseconds 500
+        $monibucaCheck = Get-NetTCPConnection -LocalPort 1935 -ErrorAction SilentlyContinue
+    } while (-not $monibucaCheck -and ((Get-Date) - $startTime).TotalSeconds -lt $timeout)
+
     if ($monibucaCheck) {
-        Write-Host "  ✅ Monibuca server launched and listening on port 1935" -ForegroundColor Green
+        Write-Host "  ✅ Monibuca server listening on port 1935" -ForegroundColor Green
     } else {
-        Write-Host "  ⚠️ Monibuca launched but port 1935 not yet listening" -ForegroundColor Yellow
-        Write-Host "     Check the Magenta Monibuca window for errors" -ForegroundColor Gray
+        Write-Host "  ⚠️ Monibuca not listening after ${timeout}s - check Magenta window" -ForegroundColor Yellow
+        $allReady = $false
     }
     Write-Host ""
 
@@ -1614,9 +1658,15 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
     # STEP 7/7: FINAL STATUS
     # ============================================================================
     Write-Host ""
-    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
-    Write-Host "                    ✅ USB STREAMING SOLUTION READY                         " -BackgroundColor DarkGreen -ForegroundColor White
-    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
+    if ($allReady) {
+        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
+        Write-Host "                    ✅ USB STREAMING SOLUTION READY                         " -BackgroundColor DarkGreen -ForegroundColor White
+        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
+    } else {
+        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Yellow
+        Write-Host "              ⚠️ USB STREAMING STARTED WITH WARNINGS                        " -BackgroundColor DarkYellow -ForegroundColor Black
+        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Yellow
+    }
     Write-Host ""
     Write-Host "  🔌 Three windows launched:" -ForegroundColor White
     Write-Host "     1. iProxy (Cyan)    - USB port forwarding" -ForegroundColor Cyan
