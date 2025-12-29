@@ -222,6 +222,7 @@ function Read-Config {
         "LastUsedConfig" = "srs_iphone_ultra_smooth_dynamic.conf"
         "StreamingServer" = "monibuca"  # Options: "monibuca", "srs" - Default to Monibuca
         "MonibucaConfig" = "monibuca_iphone_optimized.yaml"  # Default Monibuca profile
+        "SSHPassword" = "alpine"  # Default SSH password for jailbroken devices
     }
 
     if (Test-Path $script:ConfigFile) {
@@ -727,6 +728,10 @@ function Show-MainMenu {
     Write-Host "  [7] 📋 COPY RTMP URL TO CLIPBOARD" -ForegroundColor White
     Write-Host "  [8] 📱 CREATE iOS .DEB WITH CUSTOM IP" -ForegroundColor White
     Write-Host "  [9] 🧪 USB SETUP VALIDATION" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  [U] 🔌 USB STREAMING (SSH Tunnel)" -ForegroundColor Magenta
+    Write-Host "      • Streams over USB without WiFi" -ForegroundColor Gray
+    Write-Host "      • Requires OpenSSH on iPhone" -ForegroundColor Gray
     Write-Host ""
     Write-Host "  [C] ⚙️  CONFIGURATION SETTINGS" -ForegroundColor White
     Write-Host "  [Q] 🚪 QUIT" -ForegroundColor White
@@ -1302,6 +1307,334 @@ function Update-MonibucaConfigIP {
         Write-Host "  ⚠️ Could not update Monibuca config IP: $_" -ForegroundColor Yellow
         return $false
     }
+}
+
+function Start-MonibucaViaSshUsb {
+    <#
+    .SYNOPSIS
+        Starts Monibuca streaming over USB using SSH reverse tunnel.
+    .DESCRIPTION
+        Launches iproxy (USB port forwarding), SSH reverse tunnel, and Monibuca server
+        to enable RTMP streaming from iPhone to PC over USB cable without WiFi.
+        iPhone app connects to rtmp://127.10.10.10:1935/live/srs which tunnels back to PC.
+    #>
+    try { Clear-Host } catch { }
+    Write-Host ""
+    Write-Host "    =====================================================================================" -ForegroundColor Magenta
+    Write-Host "                      🔌 USB STREAMING VIA SSH REVERSE TUNNEL                           " -ForegroundColor White
+    Write-Host "    =====================================================================================" -ForegroundColor Magenta
+    Write-Host ""
+
+    Write-Host "[INFO] Preparing USB streaming with SSH tunnel..." -ForegroundColor Green
+    Write-Host ""
+
+    # ============================================================================
+    # STEP 1: Check Prerequisites
+    # ============================================================================
+    Write-Host "[STEP 1/5] 🔍 Checking prerequisites..." -ForegroundColor Yellow
+
+    # Check for iproxy.exe
+    $iproxyPath = "C:\iProxy\iproxy.exe"
+    if (-not (Test-Path $iproxyPath)) {
+        $iproxyPath = Resolve-ExecutablePath "" "iproxy.exe"
+    }
+    if (-not $iproxyPath -or -not (Test-Path $iproxyPath)) {
+        Write-Host "  ❌ iproxy.exe not found!" -ForegroundColor Red
+        Write-Host "     Expected at: C:\iProxy\iproxy.exe" -ForegroundColor Gray
+        Write-Host "     Install libimobiledevice: https://libimobiledevice.org/" -ForegroundColor Yellow
+        Write-Host ""
+        Read-Host "Press Enter to return to menu..."
+        return
+    }
+    Write-Host "  ✅ iproxy found: $iproxyPath" -ForegroundColor Green
+
+    # Check for idevice_id.exe
+    $ideviceIdPath = "C:\iProxy\idevice_id.exe"
+    if (-not (Test-Path $ideviceIdPath)) {
+        $ideviceIdPath = Resolve-ExecutablePath "" "idevice_id.exe"
+    }
+    if (-not $ideviceIdPath -or -not (Test-Path $ideviceIdPath)) {
+        Write-Host "  ❌ idevice_id.exe not found!" -ForegroundColor Red
+        Write-Host "     Expected at: C:\iProxy\idevice_id.exe" -ForegroundColor Gray
+        Write-Host ""
+        Read-Host "Press Enter to return to menu..."
+        return
+    }
+    Write-Host "  ✅ idevice_id found: $ideviceIdPath" -ForegroundColor Green
+
+    # Check for plink.exe (in project root)
+    $plinkPath = Join-Path $script:SRSHome "plink.exe"
+    if (-not (Test-Path $plinkPath)) {
+        $plinkPath = Resolve-ExecutablePath "" "plink.exe"
+    }
+    if (-not $plinkPath -or -not (Test-Path $plinkPath)) {
+        Write-Host "  ❌ plink.exe not found!" -ForegroundColor Red
+        Write-Host "     Expected in project root or PATH" -ForegroundColor Gray
+        Write-Host "     Download from: https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html" -ForegroundColor Yellow
+        Write-Host ""
+        Read-Host "Press Enter to return to menu..."
+        return
+    }
+    Write-Host "  ✅ plink found: $plinkPath" -ForegroundColor Green
+
+    # Check for Monibuca
+    $monibucaPath = Join-Path $script:SRSHome "objs\monibuca.exe"
+    if (-not (Test-Path $monibucaPath)) {
+        Write-Host "  ❌ Monibuca executable not found: $monibucaPath" -ForegroundColor Red
+        Write-Host ""
+        Read-Host "Press Enter to return to menu..."
+        return
+    }
+    Write-Host "  ✅ Monibuca found: $monibucaPath" -ForegroundColor Green
+    Write-Host ""
+
+    # ============================================================================
+    # STEP 2: Detect iPhone via USB
+    # ============================================================================
+    Write-Host "[STEP 2/5] 📱 Detecting iPhone via USB..." -ForegroundColor Yellow
+
+    $udidOutput = $null
+    try {
+        $udidOutput = & $ideviceIdPath -l 2>&1
+    } catch {
+        $udidOutput = $null
+    }
+
+    if ([string]::IsNullOrWhiteSpace($udidOutput) -or $udidOutput -match "error|ERROR") {
+        Write-Host "  ❌ No iPhone detected via USB!" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "  Troubleshooting:" -ForegroundColor Yellow
+        Write-Host "    1. Ensure iPhone is connected via USB cable" -ForegroundColor Gray
+        Write-Host "    2. Accept 'Trust This Computer' dialog on iPhone" -ForegroundColor Gray
+        Write-Host "    3. Install iTunes (includes Apple USB drivers)" -ForegroundColor Gray
+        Write-Host "    4. Try unplugging and reconnecting the cable" -ForegroundColor Gray
+        Write-Host ""
+        Read-Host "Press Enter to return to menu..."
+        return
+    }
+    Write-Host "  ✅ iPhone detected: $($udidOutput.Trim())" -ForegroundColor Green
+    Write-Host ""
+
+    # ============================================================================
+    # STEP 3: Configure SSH credentials
+    # ============================================================================
+    Write-Host "[STEP 3/7] 🔐 Configuring SSH credentials..." -ForegroundColor Yellow
+
+    $config = Read-Config
+    $savedPassword = $config.SSHPassword
+    if ([string]::IsNullOrWhiteSpace($savedPassword)) {
+        $savedPassword = "alpine"
+    }
+
+    Write-Host ""
+    Write-Host "  📝 SSH Password Configuration" -ForegroundColor Cyan
+    Write-Host "     Current saved password: $savedPassword" -ForegroundColor Gray
+    Write-Host "     (Default for jailbroken devices is 'alpine')" -ForegroundColor Gray
+    Write-Host ""
+    $passwordInput = Read-Host "     Enter SSH password (or press Enter to use saved)"
+
+    if ([string]::IsNullOrWhiteSpace($passwordInput)) {
+        $sshPassword = $savedPassword
+        Write-Host "  ✅ Using saved password" -ForegroundColor Green
+    } else {
+        $sshPassword = $passwordInput
+        # Save new password to config
+        $config.SSHPassword = $sshPassword
+        Write-Config $config
+        Write-Host "  ✅ Password updated and saved for future sessions" -ForegroundColor Green
+    }
+    Write-Host ""
+
+    # ============================================================================
+    # STEP 4: Clean up ports (including USB-specific port 2222)
+    # ============================================================================
+    Write-Host "[STEP 4/7] 🧹 Cleaning up conflicting processes..." -ForegroundColor Yellow
+    Clear-SRSPorts
+
+    # Also clean up port 2222 (used for USB SSH forwarding)
+    try {
+        $conn2222 = Get-NetTCPConnection -LocalPort 2222 -ErrorAction SilentlyContinue
+        if ($conn2222) {
+            foreach ($c in $conn2222) {
+                $pname = (Get-Process -Id $c.OwningProcess -ErrorAction SilentlyContinue).ProcessName
+                Write-Host "  🔥 Stopping '$pname' on port 2222 (PID: $($c.OwningProcess))" -ForegroundColor Red
+                Stop-Process -Id $c.OwningProcess -Force -ErrorAction SilentlyContinue
+            }
+            Start-Sleep -Seconds 1
+        } else {
+            Write-Host "  ℹ️ Port 2222 is already free" -ForegroundColor Gray
+        }
+    } catch {
+        Write-Host "  ⚠️ Could not check port 2222" -ForegroundColor Yellow
+    }
+    Write-Host ""
+
+    # ============================================================================
+    # STEP 5: Get Monibuca config (with path validation)
+    # ============================================================================
+    Write-Host "[STEP 5/7] 📄 Preparing Monibuca configuration..." -ForegroundColor Yellow
+
+    $profile = $config.MonibucaConfig
+    if ([string]::IsNullOrWhiteSpace($profile)) {
+        $profile = "monibuca_iphone_optimized.yaml"
+    }
+
+    # Security: Validate profile is a simple filename (no path traversal)
+    $profileBasename = [System.IO.Path]::GetFileName($profile)
+    if ($profile -ne $profileBasename -or $profile -match "[/\\]") {
+        Write-Host "  ⚠️ Invalid config profile name, using default" -ForegroundColor Yellow
+        $profile = "monibuca_iphone_optimized.yaml"
+    }
+
+    $configPath = Join-Path $script:SRSHome ("conf\" + $profile)
+    if (-not (Test-Path $configPath)) {
+        $configPath = Join-Path $script:SRSHome "conf\monibuca_iphone_optimized.yaml"
+    }
+    if (-not (Test-Path $configPath)) {
+        $configPath = Join-Path $script:SRSHome "config.yaml"
+    }
+
+    if (-not (Test-Path $configPath)) {
+        Write-Host "  ❌ No Monibuca config found!" -ForegroundColor Red
+        Write-Host ""
+        Read-Host "Press Enter to return to menu..."
+        return
+    }
+    Write-Host "  ✅ Using config: $(Split-Path $configPath -Leaf)" -ForegroundColor Green
+    Write-Host ""
+
+    # ============================================================================
+    # STEP 6: Launch iproxy (USB port forwarding)
+    # ============================================================================
+    Write-Host "[STEP 6/7] 🚀 Launching streaming components..." -ForegroundColor Yellow
+    Write-Host ""
+
+    # --- Launch iproxy (USB port forwarding: localhost:2222 -> iPhone:22) ---
+    Write-Host "  [1/3] Starting iproxy (USB → SSH forwarding)..." -ForegroundColor Cyan
+
+    $iproxyCommand = @"
+`$Host.UI.RawUI.WindowTitle = 'iProxy - USB Port Forwarder';
+Write-Host '========================================' -ForegroundColor Cyan;
+Write-Host '    iProxy USB Port Forwarding         ' -ForegroundColor White;
+Write-Host '========================================' -ForegroundColor Cyan;
+Write-Host '';
+Write-Host 'Forwarding: localhost:2222 -> iPhone:22' -ForegroundColor Yellow;
+Write-Host 'This enables SSH over USB cable.' -ForegroundColor Gray;
+Write-Host '';
+Write-Host 'Keep this window open!' -ForegroundColor Green;
+Write-Host '========================================' -ForegroundColor Cyan;
+Write-Host '';
+& '$iproxyPath' 2222 22;
+Write-Host '';
+Write-Host 'iProxy stopped. Press any key to close...' -ForegroundColor Yellow;
+`$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+"@
+
+    Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $iproxyCommand -WindowStyle Normal
+    Start-Sleep -Seconds 2
+
+    # Verify iproxy is listening on port 2222
+    $iproxyCheck = Get-NetTCPConnection -LocalPort 2222 -ErrorAction SilentlyContinue
+    if ($iproxyCheck) {
+        Write-Host "  ✅ iproxy launched and listening on port 2222" -ForegroundColor Green
+    } else {
+        Write-Host "  ⚠️ iproxy launched but port 2222 not yet listening" -ForegroundColor Yellow
+        Write-Host "     Check the Cyan iproxy window for errors" -ForegroundColor Gray
+    }
+
+    # --- Launch SSH reverse tunnel (remote port 1935 -> localhost:1935) ---
+    Write-Host "  [2/3] Starting SSH reverse tunnel..." -ForegroundColor Cyan
+
+    $sshCommand = @"
+`$Host.UI.RawUI.WindowTitle = 'SSH Tunnel - Port 1935';
+Write-Host '========================================' -ForegroundColor Yellow;
+Write-Host '    SSH Reverse Tunnel (Port 1935)     ' -ForegroundColor White;
+Write-Host '========================================' -ForegroundColor Yellow;
+Write-Host '';
+Write-Host 'Tunnel: iPhone:1935 -> PC:1935 (Monibuca)' -ForegroundColor Cyan;
+Write-Host 'Using saved SSH password (auto-login)' -ForegroundColor Gray;
+Write-Host '';
+Write-Host 'FIRST TIME: Type "y" to accept host key' -ForegroundColor Magenta;
+Write-Host '';
+Write-Host 'iPhone RTMP URL: rtmp://127.10.10.10:1935/live/srs' -ForegroundColor Green;
+Write-Host '========================================' -ForegroundColor Yellow;
+Write-Host '';
+& '$plinkPath' -ssh -R 1935:localhost:1935 -pw '$sshPassword' mobile@localhost -P 2222;
+Write-Host '';
+Write-Host 'SSH tunnel closed. Press any key to close...' -ForegroundColor Yellow;
+`$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+"@
+
+    Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $sshCommand -WindowStyle Normal
+    Write-Host "  ✅ SSH tunnel launched (reverse tunnel 1935 -> localhost:1935)" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  ⚠️  FIRST TIME: Accept SSH host key (type 'y') in the yellow window" -ForegroundColor Yellow
+    Write-Host "      Password auto-provided from saved config" -ForegroundColor Gray
+    Write-Host ""
+    Start-Sleep -Seconds 3
+
+    # --- Launch Monibuca ---
+    Write-Host "  [3/3] Starting Monibuca server..." -ForegroundColor Cyan
+    $configFullPath = (Resolve-Path $configPath).Path
+
+    $monibucaCommand = @"
+`$Host.UI.RawUI.WindowTitle = 'Monibuca - USB Streaming';
+Write-Host '========================================' -ForegroundColor Magenta;
+Write-Host '    MONIBUCA - USB STREAMING SERVER    ' -ForegroundColor White;
+Write-Host '========================================' -ForegroundColor Magenta;
+Write-Host '';
+Write-Host 'Listening for RTMP on port 1935' -ForegroundColor Green;
+Write-Host 'iPhone connects via SSH tunnel to:' -ForegroundColor Gray;
+Write-Host '  rtmp://127.10.10.10:1935/live/srs' -ForegroundColor Cyan;
+Write-Host '';
+Write-Host 'Web Console: http://localhost:8081/' -ForegroundColor Green;
+Write-Host '========================================' -ForegroundColor Magenta;
+Write-Host '';
+Set-Location '$script:SRSHome';
+& '$monibucaPath' -c '$configFullPath';
+Write-Host '';
+Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow;
+`$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+"@
+
+    Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $monibucaCommand -WindowStyle Normal
+    Start-Sleep -Seconds 3
+
+    # Verify Monibuca is listening on port 1935
+    $monibucaCheck = Get-NetTCPConnection -LocalPort 1935 -ErrorAction SilentlyContinue
+    if ($monibucaCheck) {
+        Write-Host "  ✅ Monibuca server launched and listening on port 1935" -ForegroundColor Green
+    } else {
+        Write-Host "  ⚠️ Monibuca launched but port 1935 not yet listening" -ForegroundColor Yellow
+        Write-Host "     Check the Magenta Monibuca window for errors" -ForegroundColor Gray
+    }
+    Write-Host ""
+
+    # ============================================================================
+    # STEP 7/7: FINAL STATUS
+    # ============================================================================
+    Write-Host ""
+    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
+    Write-Host "                    ✅ USB STREAMING SOLUTION READY                         " -BackgroundColor DarkGreen -ForegroundColor White
+    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  🔌 Three windows launched:" -ForegroundColor White
+    Write-Host "     1. iProxy (Cyan)    - USB port forwarding" -ForegroundColor Cyan
+    Write-Host "     2. SSH Tunnel (Yellow) - Reverse tunnel to iPhone" -ForegroundColor Yellow
+    Write-Host "     3. Monibuca (Magenta)  - RTMP streaming server" -ForegroundColor Magenta
+    Write-Host ""
+    Write-Host "  📱 iPhone Configuration:" -ForegroundColor White
+    Write-Host "     Install: ios/modified_debs/iosvcam_base_127_10_10_10.deb" -ForegroundColor Gray
+    Write-Host "     RTMP URL: rtmp://127.10.10.10:1935/live/srs" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  ⚠️  FIRST TIME: Accept SSH host key in yellow window (type 'y')" -ForegroundColor Yellow
+    Write-Host "      Password is auto-provided from saved config" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  🌐 Monibuca Console: http://localhost:8081/" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
+    Write-Host ""
+    Read-Host "Press Enter to return to menu..."
 }
 
 function Start-CombinedFlaskAndMonibuca {
@@ -3114,7 +3447,7 @@ try {
 
     do {
         Show-MainMenu
-        $choice = Read-Host "Choose option [A, B, 1, 3-9, C, Q]"
+        $choice = Read-Host "Choose option [A, B, 1, 3-9, U, C, Q]"
 
         if ([string]::IsNullOrEmpty($choice)) {
             $choice = "Q"
@@ -3136,6 +3469,7 @@ try {
                 "7" { Copy-RTMPUrlToClipboard }
                 "8" { Show-iOSDebCreator }
                 "9" { Show-USBValidation }
+                "U" { Start-MonibucaViaSshUsb }
                 "C" { Show-ConfigurationSettings }
                 "Q" {
                     Write-Host ""

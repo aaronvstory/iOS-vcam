@@ -59,7 +59,7 @@ curl http://localhost:1985/api/v1/versions
 1. **PowerShell Launcher (`iOS-VCAM-Launcher.ps1`)** - ~3200 lines
    - Network adapter detection with IP monitoring
    - Dynamic IP replacement via regex in configs
-   - Interactive menu with server status (options: A, B, 1, 3-9, C, Q)
+   - Interactive menu with server status (options: A, B, 1, 3-9, U, C, Q)
    - Process management for SRS/Monibuca and Flask
 
 2. **SRS Media Server (`objs/srs.exe`)**
@@ -80,6 +80,7 @@ curl http://localhost:1985/api/v1/versions
 | `Update-SRSConfigForNewIP` | ~570 | IP placeholder replacement |
 | `Show-MainMenu` | ~605 | Interactive menu display |
 | `Start-CombinedFlaskAndSRS` | ~740 | Main streaming launcher |
+| `Start-MonibucaViaSshUsb` | ~1311 | USB streaming via SSH tunnel (option U) |
 | `Show-iOSDebCreator` | ~2300 | iOS .deb builder (option 8) |
 | `Show-ConfigSelector` | ~1550 | Configuration profile picker |
 | `Show-ConfigurationSettings` | ~2870 | Settings menu (option C) |
@@ -97,6 +98,26 @@ hls_window      3-6;     # Segments in playlist (lower = less buffer)
 queue_length    1-3;     # RTMP buffer depth
 mw_latency      100-500; # Target latency in ms
 ```
+
+### USB Streaming via SSH Tunnel (Option U)
+
+Stream RTMP from iPhone to PC over USB cable using SSH reverse tunneling. Eliminates WiFi dependency for stable, low-latency streaming.
+
+**Prerequisites:**
+- `iproxy.exe` and `idevice_id.exe` at `C:\iProxy\` (libimobiledevice)
+- `plink.exe` in project root (PuTTY suite)
+- OpenSSH installed on jailbroken iPhone
+- iPhone .deb patched with `127.10.10.10` IP address
+
+**How it works:**
+1. iproxy forwards `localhost:2222 → iPhone:22` over USB
+2. SSH reverse tunnel makes iPhone's port 1935 route back to PC's Monibuca
+3. iPhone app connects to `rtmp://127.10.10.10:1935/live/srs`
+4. Traffic flows: iPhone → SSH tunnel → USB → PC Monibuca
+
+**Files:**
+- Pre-built .deb: `ios/modified_debs/iosvcam_base_127_10_10_10.deb`
+- Full docs: `tasks/USB-SSH-STREAMING-GUIDE.md`
 
 ### iOS .deb Package System
 
