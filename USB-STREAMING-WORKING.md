@@ -10,8 +10,13 @@
 
 1. **Run launcher as Administrator**
 2. **Select Option [U]** - USB Streaming via SSH Tunnel
-3. **In OBS:** Stream to `rtmp://localhost:1935/live/srs`
-4. **On iPhone:** Open iOS-VCAM app → receives the OBS stream as virtual camera
+3. **Sub-menu options:**
+   - `[1]` Start USB Streaming (default)
+   - `[K]` Kill All Processes & Restart Fresh
+   - `[S]` Status - Show Running Processes
+   - `[Q]` Back to Main Menu
+4. **In OBS:** Stream to `rtmp://localhost:1935/live/srs`
+5. **On iPhone:** Open iOS-VCAM app → receives the OBS stream as virtual camera
 
 ---
 
@@ -184,8 +189,13 @@ netstat -an | grep 127.10.10.10
 - **Fix:** Command must include keep-alive like `'echo TUNNEL_ACTIVE; cat'`
 
 ### "Connection Reset" Errors
-- Kill all existing iproxy/plink processes and restart
+- Use **Option [K]** in the USB streaming menu to kill all processes and restart fresh
 - Ensure iPhone is unlocked and USB is connected
+
+### Stream Not Flowing / Clogged
+- Use **Option [K]** to kill all processes and restart fresh
+- Use **Option [S]** to check which processes are running
+- Restart OBS and re-connect the stream
 
 ---
 
