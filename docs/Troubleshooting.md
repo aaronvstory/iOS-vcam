@@ -60,6 +60,30 @@
 
 ---
 
+## 🔐 SSH & Installation Issues
+
+### SSH Connection Fails (Option [9])
+*   **Cause:** Tunnel not active or wrong credentials.
+*   **Fix:**
+    *   **3uTools:** Ensure "SSH Tunnel" is OPEN in Toolbox. Port 22 should be mapped to local port (usually 22 or 2222).
+    *   **Credentials:** If you changed the root password from `alpine`, choose "No" when asked to use defaults, and enter your custom password.
+    *   **USB:** Disconnect and reconnect the Lightning cable.
+
+### "dpkg: error processing archive"
+*   **Cause:** Corrupt .deb file or architecture mismatch.
+*   **Fix:**
+    *   Regenerate the .deb using `ios_deb_ip_changer_final.py`.
+    *   Ensure the iPhone has enough storage space (`df -h`).
+    *   Try installing manually via Filza on the device to see the exact error message.
+
+### "Host key verification failed"
+*   **Cause:** The SSH key fingerprint of the iPhone changed (common after re-jailbreaking).
+*   **Fix:**
+    *   Delete the cached key from the registry or `known_hosts`.
+    *   Run the command manually in CMD to accept the new key: `.\plink.exe -ssh -P 2222 root@127.0.0.1`
+
+---
+
 ## 📱 iOS Specific
 
 ### App Crashes when Camera Opens

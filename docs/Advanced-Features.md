@@ -2,18 +2,37 @@
 
 ## 🔐 SSH & .deb Installation
 
-The launcher includes a powerful feature (Option [9]) to install `.deb` packages directly to your iPhone.
+> **Security Note:** This tool is designed for **personal use on your own devices** over a direct USB connection. The SSH credentials (default: `alpine`) connect only to your locally-attached iPhone—there is no network exposure. Password-based authentication is used for simplicity; advanced users who prefer key-based auth can configure their iPhone's OpenSSH accordingly and disable the password prompt in `config.ini`.
 
-### How it works
-1.  **Discovery:** Scans `ios/modified_debs/` for packages.
-2.  **Transport:** Uses `pscp.exe` (PuTTY SCP) to copy the file to `/var/mobile/Documents/`.
-3.  **Installation:** Uses `plink.exe` to execute `dpkg -i` on the device.
-4.  **Respring:** Can optionally restart SpringBoard or `mediaserverd`.
+The launcher includes a powerful feature (**Option [9]**) to install `.deb` packages directly to your iPhone without manual file transfer.
+
+### Automated Installation (Option [9])
+This feature streamlines the process of updating your VCAM tweak or installing modified packages.
+
+**How it works:**
+1.  **Discovery:** Scans `ios/modified_debs/` for available packages.
+2.  **Connection Test:** Automatically verifies SSH connectivity to the device before attempting transfer.
+3.  **Transport:** Uses `pscp.exe` (PuTTY SCP) to securely copy the selected file to `/var/mobile/Documents/`.
+4.  **Installation:** Uses `plink.exe` to execute `dpkg --force-architecture --force-depends -i [file]` on the device.
+5.  **Respring:** Can optionally restart SpringBoard or `mediaserverd` to apply changes immediately.
 
 ### Customizing SSH
-If you changed your root password (recommended!):
-*   The launcher prompts for credentials on first use (default: `alpine`). Your password is saved to `config.ini`.
-*   You can also configure custom ports if you are using non-standard forwarding.
+The launcher uses default credentials but fully supports custom configurations.
+
+*   **Default:** `localhost:22` (via USB tunnel) or local IP, User: `root`, Password: `alpine`.
+*   **Custom:** If you have changed your root password (highly recommended) or use a non-standard port:
+    *   The launcher will prompt for credentials if the default fails.
+    *   Your custom password and port settings are saved to `config.ini` for future use.
+
+### Manual SSH Tools
+The distribution includes `plink.exe` and `pscp.exe` in the root directory. You can use these for your own scripting:
+```powershell
+# Run a command
+.\plink.exe -ssh root@localhost -P 2222 -pw alpine "ls -la"
+
+# Copy a file
+.\pscp.exe -P 2222 -pw alpine myfile.deb root@localhost:/var/mobile/Documents/
+```
 
 ---
 

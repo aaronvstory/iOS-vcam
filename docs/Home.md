@@ -2,6 +2,12 @@
 
 Welcome to the **iOS-VCAM-Server** documentation. This wiki provides comprehensive guides for installing, configuring, and using the iOS-VCAM streaming server, optimized for jailbroken iOS devices.
 
+## 🆕 What's New (v3.2+)
+
+*   **SSH Installation Tool (Option [9]):** Directly install or update `.deb` packages to your iPhone from the launcher. No more manual file copying! [Read more](Advanced-Features.md#automated-installation-option-9)
+*   **Enhanced Debranding:** Improved tools for customizing the iOS package identity.
+*   **Stability Fixes:** Solved PowerShell parser errors and improved USB tunneling stability.
+
 ## 📚 Table of Contents
 
 ### [🚀 Installation Guide](Installation.md)
