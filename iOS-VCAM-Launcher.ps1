@@ -2138,13 +2138,15 @@ Write-Host 'SSH Tunnel disconnected. Press any key...' -ForegroundColor Yellow;
     Write-Host "     3. Monibuca (Magenta)   - RTMP streaming server (port 1935)" -ForegroundColor Magenta
     Write-Host "     4. SSH Tunnels (Yellow) - Reverse tunnels to iPhone" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "  📱 iPhone Setup:" -ForegroundColor White
+    Write-Host "  🎬 OBS Stream Settings:" -ForegroundColor White
+    Write-Host "     Server: rtmp://localhost:1935/live" -ForegroundColor Cyan
+    Write-Host "     Stream Key: srs" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  📱 iPhone App (PULLS stream via tunnel):" -ForegroundColor White
+    Write-Host "     Uses: rtmp://127.10.10.10:1935/live/srs" -ForegroundColor Green
     Write-Host "     1. Install: ios/modified_debs/iosvcam_base_127_10_10_10.deb" -ForegroundColor Gray
     Write-Host "     2. Connect via USB cable" -ForegroundColor Gray
     Write-Host "     3. Open iOS-VCAM app and tap Connect" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "  🎬 OBS/Streaming Software:" -ForegroundColor White
-    Write-Host "     RTMP URL: rtmp://localhost:1935/live/srs" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "  ⚠️  FIRST TIME: Accept SSH host key in yellow window (type 'y')" -ForegroundColor Yellow
     Write-Host ""
