@@ -50,7 +50,7 @@
 
 ### "PowerShell Parser Error" (Crash on Start)
 *   **Status:** Fixed in v3.2.1.
-*   **Fix:** If using an old version, update to v3.2.1+. Use the latest `iOS-VCAM-Launcher.exe`.
+*   **Fix:** If using an outdated version, update to v3.2.1+. Use the latest `iOS-VCAM-Launcher.exe`.
 
 ### "Port 1935 in use"
 *   **Cause:** Another instance of SRS or another server is running.

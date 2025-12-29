@@ -12,7 +12,7 @@ The launcher includes a powerful feature (Option [9]) to install `.deb` packages
 
 ### Customizing SSH
 If you changed your root password (recommended!):
-*   The launcher will prompt for credentials if default (`alpine`) fails.
+*   The launcher prompts for credentials on first use (default: `alpine`). Your password is saved to `config.ini`.
 *   You can also configure custom ports if you are using non-standard forwarding.
 
 ---
