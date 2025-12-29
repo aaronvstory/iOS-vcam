@@ -141,6 +141,25 @@ srs_log_tank    console;
 srs_log_level   trace;
 ```
 
+## Documentation (KEEP UPDATED)
+
+User-facing wiki documentation lives in `docs/`:
+
+| File | Purpose |
+|------|---------|
+| `Home.md` | Wiki index with navigation |
+| `Installation.md` | Prerequisites and setup guide |
+| `Configuration.md` | SRS config profiles and parameters |
+| `Streaming-Guide.md` | WiFi/USB streaming howto |
+| `Troubleshooting.md` | Common issues and fixes |
+| `Advanced-Features.md` | SSH, debranding, Frida, architecture |
+
+**Maintenance Rules:**
+- When menu options change, update references in docs (e.g., "Option [3]")
+- When adding features, update relevant wiki page
+- Keep `Home.md` ToC in sync with actual pages
+- Review docs after any launcher refactoring
+
 ## Commit Guidelines
 
 Follow imperative, present-tense style: `Fix Flask server to use port 80`. Reference affected paths and note any configs/binaries that must be regenerated.
