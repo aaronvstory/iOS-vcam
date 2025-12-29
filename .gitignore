@@ -1,0 +1,166 @@
+# ============================================================================
+# iOS-VCAM Server Distribution - .gitignore
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Runtime & Generated Files
+# ----------------------------------------------------------------------------
+
+# HLS streaming segments and playlists (generated during streaming)
+objs/nginx/html/[app]/
+objs/nginx/html/live/*.ts
+objs/nginx/html/live/*.m3u8
+objs/nginx/html/live/*.tmp
+*.ts.tmp
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Log files
+*.log
+logs/
+fatal/
+
+# SRS server ID file (generated at runtime)
+objs/srs.id
+
+# ----------------------------------------------------------------------------
+# Python
+# ----------------------------------------------------------------------------
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+*.egg
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# ----------------------------------------------------------------------------
+# IDE & Editor
+# ----------------------------------------------------------------------------
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# ----------------------------------------------------------------------------
+# Development Tools
+# ----------------------------------------------------------------------------
+
+# Serena (code intelligence)
+.serena/
+
+# Local history
+.history/
+
+# Claude Code tasks
+tasks/
+
+# ----------------------------------------------------------------------------
+# Build & Distribution
+# ----------------------------------------------------------------------------
+
+# Distribution packages (generated)
+dist/
+dist-min/
+*.zip
+*.tar.gz
+*.7z
+
+# Archives
+archive/
+archives/
+
+# Modified .deb packages (generated from base)
+ios/modified_debs/
+modified_debs/
+
+# Temporary extraction directories
+ios/temp_*/
+temp_*/
+temp_extract/
+
+# ps2exe compiler (can be downloaded)
+ps2exe.ps1
+
+# Old compile scripts (only keep current version)
+compile-v4.0*.ps1
+compile-v4.1*.ps1
+
+# ----------------------------------------------------------------------------
+# Backup & Temporary Files
+# ----------------------------------------------------------------------------
+
+*.backup
+*.bak
+*.old
+*.orig
+*.tmp
+*.temp
+
+# Windows-specific temp files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS-specific
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ----------------------------------------------------------------------------
+# Configuration (local overrides)
+# ----------------------------------------------------------------------------
+
+# Local config overrides (not for distribution)
+config.local.ini
+*.local.conf
+
+# Monibuca database
+m7s.db
+
+# Runtime config files (generated)
+config.yaml
+config.ini
+
+# ----------------------------------------------------------------------------
+# Sensitive Files (NEVER commit)
+# ----------------------------------------------------------------------------
+
+# SSH keys and credentials
+*.pem
+*.key
+id_rsa*
+*.ppk
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Secrets
+secrets/
+credentials/

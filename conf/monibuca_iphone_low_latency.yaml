@@ -1,0 +1,55 @@
+# Monibuca Configuration - iPhone Ultra Low Latency
+# Minimal buffering for real-time streaming
+# NOTE: Uses 0.0.0.0 for binding to work on any network
+
+global:
+  http: "0.0.0.0:8081"
+  rtmp: "0.0.0.0:1935"
+  loglevel: "info"
+
+http:
+  listen_addr: "0.0.0.0:8081"
+  cors: true
+
+rtmp:
+  listen_addr: "0.0.0.0:1935"
+  chunk_size: 128          # Smaller chunks for lower latency
+  gop_cache: false
+  publish_timeout: 10
+  read_timeout: 3
+  write_timeout: 3
+
+hls:
+  enable: true
+  fragment: 1              # 1-second fragments for low latency
+  window: 2                # Only 2 fragments buffer
+  path: "./objs/nginx/html"
+  cleanup: true
+  wait_close: 1000
+
+httpflv:
+  enable: true
+  cors: true
+
+engine:
+  ring_size: 128           # Smaller buffer
+  pool_size: 512
+  tcp_nodelay: true
+  send_buffer_size: 1000000
+  recv_buffer_size: 1000000
+  gop_cache_len: 0
+  wait_close_publisher: 1000
+  wait_close_subscriber: 3000
+  
+  audio:
+    enable: true
+    codec: ["aac"]
+  video:
+    enable: true
+    codec: ["h264"]
+
+
+
+
+
+

@@ -1,0 +1,104 @@
+# Monibuca Configuration - iPhone RTMP Optimized Streaming
+# Equivalent to SRS iPhone optimized config for Option B
+# Optimized for smooth iPhone playback over WiFi
+# NOTE: Uses 0.0.0.0 for binding to work on any network
+
+# Global configuration
+global:
+  # Listen addresses - bind to all interfaces
+  http: "0.0.0.0:8081"          # Web console and API
+  rtmp: "0.0.0.0:1935"          # RTMP ingest
+  rtsp: "0.0.0.0:554"           # RTSP (optional)
+  
+  # Logging
+  loglevel: "info"
+  logfile: ""               # Empty means console output
+
+# HTTP API and Console
+http:
+  listen_addr: "0.0.0.0:8081"
+  cors: true                # Enable CORS for web access
+  username: ""              # No auth for compatibility
+  password: ""
+
+# RTMP Plugin Configuration
+rtmp:
+  listen_addr: "0.0.0.0:1935"
+  chunk_size: 60000         # Match SRS large chunks
+  gop_cache: true           # Cache GOP for smoother start/recovery (more latency)
+  publish_timeout: 15       # 15 second timeout like SRS
+  read_timeout: 5           # 5 second timeout
+  write_timeout: 5
+  
+# HLS Plugin Configuration  
+hls:
+  enable: true
+  fragment: 2               # 2-second fragments like SRS
+  window: 4                 # 4 fragments = 8 seconds buffer
+  path: "./objs/nginx/html"
+  cleanup: true             # Auto cleanup old segments
+  wait_close: 2000          # Wait 2s before cleanup
+
+# HTTP-FLV Configuration
+httpflv:
+  enable: true
+  cors: true
+
+# GB28181 Plugin (disabled)
+gb28181:
+  enable: false
+
+# WebRTC Plugin (disabled for iPhone focus)
+webrtc:
+  enable: false
+
+# Recording Plugin (disabled)
+record:
+  enable: false
+
+# Jessica Plugin (transcoding - disabled)
+jessica:
+  enable: false
+
+# HDL Plugin (HTTP download - enabled)
+hdl:
+  enable: true
+  cors: true
+
+# Network Optimizations
+engine:
+  # Buffer settings
+  ring_size: 1024           # Larger buffer = smoother playback (more latency)
+  pool_size: 1024          # Memory pool size
+  
+  # Latency optimizations
+  tcp_nodelay: true        # Disable Nagle's algorithm
+  send_buffer_size: 5000000
+  recv_buffer_size: 5000000
+  
+  # Performance settings
+  event_size: 1024
+  gop_cache_len: 0         # No GOP cache
+  wait_close_publisher: 3000
+  wait_close_subscriber: 10000
+  
+  # Stream settings
+  audio:
+    enable: true
+    codec: ["aac", "pcma", "pcmu"]
+  video:
+    enable: true  
+    codec: ["h264", "h265"]
+
+# Subscribe/Publish hooks (disabled for simplicity)
+hook:
+  enable: false
+
+# Cluster configuration (disabled)
+cluster:
+  enable: false
+
+# Prometheus metrics (optional)
+prometheus:
+  enable: false
+  listen_addr: ":2112"

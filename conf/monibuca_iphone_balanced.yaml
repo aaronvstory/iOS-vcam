@@ -1,0 +1,49 @@
+# Monibuca Configuration - iPhone Balanced Performance
+# Balance between latency and stability
+# NOTE: Uses 0.0.0.0 for binding to work on any network
+
+global:
+  http: "0.0.0.0:8081"
+  rtmp: "0.0.0.0:1935"
+  loglevel: "info"
+
+http:
+  listen_addr: "0.0.0.0:8081"
+  cors: true
+
+rtmp:
+  listen_addr: "0.0.0.0:1935"
+  chunk_size: 4096         # Medium chunk size
+  gop_cache: false
+  publish_timeout: 20
+  read_timeout: 10
+  write_timeout: 10
+
+hls:
+  enable: true
+  fragment: 3              # 3-second fragments
+  window: 5                # 15 seconds buffer
+  path: "./objs/nginx/html"
+  cleanup: true
+  wait_close: 3000
+
+httpflv:
+  enable: true
+  cors: true
+
+engine:
+  ring_size: 512
+  pool_size: 2048
+  tcp_nodelay: true
+  send_buffer_size: 5000000
+  recv_buffer_size: 5000000
+  gop_cache_len: 0
+  wait_close_publisher: 5000
+  wait_close_subscriber: 15000
+  
+  audio:
+    enable: true
+    codec: ["aac", "pcma", "pcmu"]
+  video:
+    enable: true
+    codec: ["h264", "h265"]

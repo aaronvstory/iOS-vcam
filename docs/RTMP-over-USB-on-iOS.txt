@@ -1,0 +1,229 @@
+ RTMP over USB on iOS
+A detailed guide with step-by-step explanations
+
+🎯 Why is this needed?
+You want to stream video from your computer to your iPhone, but WiFi is slow or unstable. The solution is to transfer via a USB cable, like on Android with adb reverse. On iOS, it's a bit more complex, but achievable.
+
+What we will get in the end:
+
+Stable RTMP stream without WiFi
+Minimal latency
+Works via a standard USB cable
+📦 What to install
+On the computer (Windows):
+1. OBS Studio
+Software for video capture and streaming
+Download: obsproject.com
+Install it like a regular program
+📷Screenshot
+2. LaL-Server
+This is an RTMP server that will receive the stream from OBS
+Download: Github.com
+After installation, just run it
+📷Screenshot
+Окно MonaServer
+3. iProxy (libimobiledevice)
+A tool for working with iOS devices via USB
+Download a pre-built version: Github.com
+Unpack it to any folder (e.g., C:\iproxy)
+On the iPhone:
+1. Jailbreak
+The device must be jailbroken
+If it's not, this method will not work
+2. OpenSSH Server
+Open Sileo or Zebra (your package manager)
+Search for OpenSSH
+Install the OpenSSH server package (not Client!)
+📷Screenshot
+Окно MonaServer
+🚀 Step-by-step setup
+1
+Preparation
+1.1. Run LaL-Server on the computer
+Find the lalserver.exe shortcut and run it
+A window with text should appear - this is normal
+Leave it running (do not close it)
+📷Screenshot
+Окно MonaServer
+1.2. Connect iPhone to the computer
+Take a standard USB cable (Lightning or USB-C)
+Connect the iPhone to the computer
+A prompt Trust This Computer? may appear on the iPhone - tap Trust
+Enter the iPhone unlock password
+📷Screenshot
+Окно MonaServer
+2
+Check iPhone connection
+2.1. Open Command Prompt on Windows
+There are several ways:
+
+Press Win + R, type cmd, and press Enter
+OR press Win + X and select Windows PowerShell
+2.2. Navigate to the iProxy folder
+If you unpacked iProxy to C:\iproxy, enter:
+
+cd C:\iproxy
+Press Enter.
+
+If it's in another folder, enter your path. For example:
+
+cd C:\Users\ВашеИмя\Downloads\iproxy
+2.3. Check if the computer sees the iPhone
+Enter the command:
+
+idevice_id.exe -l
+Press Enter.
+
+What should happen:
+A long string of numbers and letters will appear - this is your iPhone's UDID
+For example: 00008020-000814E23EF8002E
+📷Screenshot
+Окно MonaServer
+If nothing appears:
+Check the USB cable
+Make sure you tapped "Trust" on the iPhone
+Install iTunes (it comes with the necessary Apple drivers)
+Try a different USB port
+3
+Forward SSH port over USB
+3.1. In the same command prompt window, enter:
+iproxy.exe 2222 22
+Press Enter.
+
+What this command means:
+iproxy.exe - run the program
+2222 - local port on the computer
+22 - SSH port on the iPhone
+Basically: "everything that comes to port 2222 on the computer, send to port 22 on the iPhone"
+What should happen:
+The window will show text:
+waiting for connection
+
+This is normal! The program is running and waiting for a connection.
+📷Screenshot
+Окно MonaServer
+IMPORTANT: Do not close this window! It must be running the entire time you are streaming.
+4
+Create a reverse tunnel via SSH
+4.1. Open a NEW command prompt window
+Without closing the previous window with iProxy:
+
+Press Win + R again, type powershell, and press Enter
+OR press Win + X and select Windows PowerShell
+4.2. Connect to the iPhone via SSH
+Enter the command:
+
+ssh -R 1935:localhost:1935 mobile@localhost -p 2222
+Press Enter.
+
+Command breakdown:
+ssh - connect via SSH
+-R 1935:localhost:1935 - create a reverse tunnel for port 1935
+mobile - username on the iPhone
+@localhost - connect to the local address (via iproxy it goes to the iPhone)
+-p 2222 - use port 2222 (which we forwarded in the previous step)
+4.3. First connection
+On the first connection, a question will appear:
+
+Are you sure you want to continue connecting (yes/no/[fingerprint])?
+Type: yes and press Enter.
+
+4.4. Enter the password
+A prompt will appear:
+
+mobile@localhost's password:
+Enter: the password you specified when installing the jailbreak and press Enter.
+
+Note: When you type the password, the characters are not displayed - this is normal for security. Just type and press Enter.
+4.5. Shell configuration (first time)
+The Z Shell configuration menu may appear:
+
+This is the Z Shell configuration function for new users...
+--- Type one of the keys in parentheses ---
+Just press: 0 (zero) and Enter.
+
+What should happen:
+You will see the iPhone command prompt, for example:
+iPhone:~ mobile$
+
+This means you are inside the iPhone! The SSH tunnel is working.
+📷Screenshot
+Окно MonaServer
+IMPORTANT: Do not close this window! As long as it is open, the tunnel is active.
+5
+Configure OBS Studio
+5.1. Open OBS Studio
+5.2. Go to stream settings
+Click Settings
+In the left menu, select Stream
+5.3. Fill in the fields:
+Service: select Custom...
+
+Server: enter
+
+rtmp://127.0.0.1:1935/live/
+Stream Key: enter
+
+test
+(you can use any word instead of test)
+
+📷Screenshot
+Окно MonaServer
+5.4. Save the settings
+Click OK or Apply
+
+6
+Start the stream on the iPhone
+6.1. Open our virtual camera on the iPhone
+6.2. Enter the stream address:
+rtmp://127.0.0.1:1935/live/test
+📷Screenshot
+Address breakdown:
+rtmp:// - protocol
+127.0.0.1 - local address (thanks to the SSH tunnel, this now leads to the computer)
+:1935 - port
+/live/test - stream path (must match the settings in OBS)
+6.3. Start streaming in OBS
+On the computer, in OBS, click Start Streaming
+
+6.4. Connect in the virtual camera on the iPhone
+✅ It should work! The video from the computer will appear on the iPhone.
+📷Screenshot
+🔍 What if it doesn't work?
+Problem 1: "idevice_id.exe not found"
+Solution: You did not navigate to the iProxy folder.
+
+Use the cd command to go to the folder
+Or provide the full path: C:\iproxy\idevice_id.exe -l
+Problem 2: iPhone is not detected
+Solution:
+
+Install iTunes (even if you don't use it)
+Check that you tapped Trust on the iPhone
+Try a different USB cable/port
+Reboot the iPhone
+Problem 3: SSH does not connect
+Solution:
+
+Make sure OpenSSH Server is installed on the iPhone
+Check that the window with iproxy.exe 2222 22 is still running
+Try connecting as root instead of mobile:
+ssh -R 1935:localhost:1935 root@localhost -p 2222
+Problem 4: Video does not play on iPhone
+Solution:
+
+Make sure LaL-Server is running on the computer
+Check that both windows (iProxy and SSH) are running
+Make sure the stream is started in OBS
+Check the address in the player: rtmp://127.0.0.1:1935/live/test
+💡 Useful tips
+1. Save the commands
+
+Create a text file with the commands so you don't have to look for them every time:
+Окно 1: iproxy.exe 2222 22
+Окно 2: ssh -R 1935:localhost:1935 mobile@localhost -p 2222
+2. Change the password (for security)
+
+After the first SSH connection to the iPhone, execute:
+passwd
+Enter the new password twice.
