@@ -1,0 +1,56 @@
+YOLO mode is enabled. All tool calls will be automatically approved.
+Session cleanup disabled: Either maxAge or maxCount must be specified
+Loaded cached credentials.
+Loading extension: chime
+Loading extension: chrome-devtools-mcp
+Loading extension: code-review
+Loading extension: criticalthink
+Loading extension: extension-browser
+Loading extension: gemini-cli-prompt-library
+Loading extension: genkit
+Loading extension: google-fonts
+Loading extension: nanobanana
+Server 'chime-notification-server' supports tool updates. Listening for changes...
+Server 'extension-browser-server' supports tool updates. Listening for changes...
+Server 'google-fonts-local-mcp' supports tool updates. Listening for changes...
+Server 'chrome-devtools' supports tool updates. Listening for changes...
+Server 'genkit' supports tool updates. Listening for changes...
+```json
+[
+ {
+  "severity": "MEDIUM",
+  "title": "Potential Tunnel Address Mismatch",
+  "details": "The command `plink -R 1935:localhost:1935` typically binds the listener to `127.0.0.1` on the remote device (iPhone). However, the documentation and code comments state the iPhone app is patched to connect to `127.10.10.10`. Unless the iPhone OS routes `127.10.10.10` to `127.0.0.1` automatically (which is not guaranteed on all systems), the connection may fail.",
+  "file": "iOS-VCAM-Launcher.ps1",
+  "line": 1502,
+  "recommendation": "Verify if the iPhone environment routes the 127.x.x.x range to loopback. If not, update the plink command to bind explicitly: `-R 127.10.10.10:1935:localhost:1935` (requires sshd `GatewayPorts clientspecified` or similar configuration)."
+ },
+ {
+  "severity": "LOW",
+  "title": "Hardcoded Dependency Paths",
+  "details": "The script hardcodes `C:\\iProxy\\iproxy.exe` and `C:\\iProxy\\idevice_id.exe`. While it falls back to `Resolve-ExecutablePath`, this assumes a specific folder structure that may not exist on all developer machines.",
+  "file": "iOS-VCAM-Launcher.ps1",
+  "line": 1332,
+  "recommendation": "Move the search paths to a configuration block or variable at the top of the script to make it easier to customize without editing the function logic."
+ },
+ {
+  "severity": "LOW",
+  "title": "SSH Host Key Verification UX",
+  "details": "When `plink` is launched in a new window, it will block on the 'Store key in cache?' prompt if the host is unknown. If the user misses this prompt in the new window, the setup will hang silently.",
+  "file": "iOS-VCAM-Launcher.ps1",
+  "line": 1502,
+  "recommendation": "The warning message added is good. Consider adding `-batch` to the plink command to fail immediately if the key is unknown, or instruct the user to run a manual connection test first if they encounter issues."
+ }
+]
+```
+
+### Summary
+
+The changes introduce a robust "USB Streaming" feature using standard tools (`iproxy`, `plink`). The implementation follows the existing project structure and style well.
+
+**Key Findings:**
+*   **Networking Logic**: The main technical risk is the mismatch between the `plink` default bind address (`127.0.0.1`) and the target IP mentioned in the docs (`127.10.10.10`). This needs verification on the actual device.
+*   **User Experience**: The script wisely uses separate windows for the tunnel components, allowing users to see logs and interactive prompts (like SSH key acceptance).
+*   **Dependencies**: The checks for `iproxy` and `idevice_id` are good, though slightly rigid with the `C:\iProxy` path.
+
+The code is generally safe and idiomatic for a PowerShell launcher script.

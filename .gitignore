@@ -164,3 +164,6 @@ id_rsa*
 # Secrets
 secrets/
 credentials/
+
+# Auto Claude data directory
+.auto-claude/

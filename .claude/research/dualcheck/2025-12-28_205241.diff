@@ -1,0 +1,580 @@
+diff --git a/iOS-VCAM-Launcher.ps1 b/iOS-VCAM-Launcher.ps1
+index 0ed3c51..07dc762 100644
+--- a/iOS-VCAM-Launcher.ps1
++++ b/iOS-VCAM-Launcher.ps1
+@@ -703,15 +703,10 @@ function Show-MainMenu {
+     Write-Host "  [1] 🔐 FLASK AUTHENTICATION SERVER (Standalone)" -ForegroundColor White
+     Write-Host "      • Handles iOS app authentication/validation" -ForegroundColor Gray
+     Write-Host "      • Auto-installs Flask if needed" -ForegroundColor Gray
+     Write-Host "      • Uses detected IP: $script:CurrentIP" -ForegroundColor Gray
+     Write-Host ""
+-    Write-Host "  [2] 📱 ENHANCED .DEB BUILDER (Custom IP + Fixes)" -ForegroundColor Cyan
+-    Write-Host "      • Build Standard or Tweaked (1s Latency Fix) packages" -ForegroundColor Gray
+-    Write-Host "      • Choose whichever IP address you need on the fly" -ForegroundColor Gray
+-    Write-Host "      • Auto-validates IP length (12 chars required)" -ForegroundColor Gray
+-    Write-Host ""
+     if ($isMonibuca) {
+         Write-Host "  [3] ⚙️  SELECT/CHANGE MONIBUCA PROFILE" -ForegroundColor White
+         Write-Host "      • Choose Monibuca profile to use with Option [A]" -ForegroundColor Gray
+     } else {
+         Write-Host "  [3] ⚙️  SELECT/CHANGE SRS CONFIG (iPhone Optimized)" -ForegroundColor White
+@@ -731,18 +726,10 @@ function Show-MainMenu {
+     Write-Host "  [6] 🔄 REFRESH NETWORK DETECTION" -ForegroundColor White
+     Write-Host "  [7] 📋 COPY RTMP URL TO CLIPBOARD" -ForegroundColor White
+     Write-Host "  [8] 📱 CREATE iOS .DEB WITH CUSTOM IP" -ForegroundColor White
+     Write-Host "  [9] 🧪 USB SETUP VALIDATION" -ForegroundColor White
+     Write-Host ""
+-    Write-Host "  [U] 🔌 USB FORWARDER MODE (No Hotspot)" -ForegroundColor Magenta
+-    Write-Host "      • Streams over USB without carrier/hotspot" -ForegroundColor Gray
+-    Write-Host "      • Requires iPhone forwarder + 127.10.10.10 .deb" -ForegroundColor Gray
+-    Write-Host ""
+-    Write-Host "  [T] 📱 USB HOTSPOT MODE (Personal Hotspot)" -ForegroundColor Magenta
+-    Write-Host "      • Uses iPhone Personal Hotspot over USB" -ForegroundColor Gray
+-    Write-Host "      • Requires carrier/Hotspot enabled" -ForegroundColor Gray
+-    Write-Host ""
+     Write-Host "  [C] ⚙️  CONFIGURATION SETTINGS" -ForegroundColor White
+     Write-Host "  [Q] 🚪 QUIT" -ForegroundColor White
+     Write-Host ""
+     Write-Host "    " -NoNewline
+     Write-Host "╚═══════════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor DarkGray
+@@ -1501,94 +1488,10 @@ Write-Host 'USB Listener stopped. Press any key to close...' -ForegroundColor Ye
+     Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $psCommand -WindowStyle Normal
+     Write-Host "  ✅ $Label launched in new window!" -ForegroundColor Green
+     return $true
+ }
+ 
+-function Show-EnhancedDebBuilder {
+-    try { Clear-Host } catch { }
+-    Show-SRSAsciiArt
+-    Write-Host ""
+-    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
+-    Write-Host "                    📱 ENHANCED iOS .DEB BUILDER                           " -BackgroundColor DarkGreen -ForegroundColor White
+-    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
+-    Write-Host ""
+-    Write-Host "  This tool builds a custom iOS .deb package with your specific IP." -ForegroundColor Gray
+-    Write-Host ""
+-    Write-Host "  [1] 🚀 STANDARD .DEB BUILDER" -ForegroundColor White
+-    Write-Host "      • Just updates the IP address in the binary" -ForegroundColor Gray
+-    Write-Host "      • Recommended for most users" -ForegroundColor Gray
+-    Write-Host ""
+-    Write-Host "  [2] 🏎️  TWEAKED .DEB (1s Latency/Burst Fix)" -ForegroundColor Cyan
+-    Write-Host "      • Updates IP + patches binary for ultra-low latency" -ForegroundColor Gray
+-    Write-Host "      • Forces more frequent data flushes (1ms/1-frame intervals)" -ForegroundColor Gray
+-    Write-Host "      • FIXES the 1-second 'bursting' issue seen on some devices" -ForegroundColor Green
+-    Write-Host ""
+-    Write-Host "  [B] ← BACK to main menu" -ForegroundColor White
+-    Write-Host ""
+-    
+-    $choice = Read-Host "Select build type [1, 2, B]"
+-    
+-    if ($choice -eq "B" -or $choice -eq "b") { return }
+-    
+-    $applyTweak = $false
+-    if ($choice -eq "2") {
+-        $applyTweak = $true
+-        Write-Host "  ✅ Tweak enabled (1s Latency Fix)" -ForegroundColor Green
+-    } else {
+-        Write-Host "  ✅ Standard build selected" -ForegroundColor White
+-    }
+-    
+-    Write-Host ""
+-    $targetIP = Read-Host "Enter Target IP address [Default: $script:CurrentIP]"
+-    if ([string]::IsNullOrWhiteSpace($targetIP)) {
+-        $targetIP = $script:CurrentIP
+-    }
+-    
+-    # Validate IP length (12 chars required for binary patching)
+-    if ($targetIP.Length -ne 12) {
+-        Write-Host ""
+-        Write-Host "⚠️  WARNING: IP is $($targetIP.Length) characters. It MUST be exactly 12 chars for binary patching!" -ForegroundColor Yellow
+-        Write-Host "   Example: 192.168.1.91 (12 chars)" -ForegroundColor Gray
+-        Write-Host "   Example: 10.10.10.100 (12 chars)" -ForegroundColor Gray
+-        Write-Host ""
+-        $confirm = Read-Host "Try to build anyway? [Y/N]"
+-        if ($confirm -ne "Y" -and $confirm -ne "y") { return }
+-    }
+-    
+-    Write-Host ""
+-    Write-Host "  🛠️  Building package for $targetIP..." -ForegroundColor Cyan
+-    
+-    $iosDir = Join-Path $script:SRSHome "ios"
+-    $scriptPath = Join-Path $iosDir "ios_deb_ip_changer_final.py"
+-    
+-    if (-not (Test-Path $scriptPath)) {
+-        Write-Host "  ❌ Builder script not found: $scriptPath" -ForegroundColor Red
+-        Read-Host "Press Enter to return"
+-        return
+-    }
+-    
+-    # Use array for arguments to avoid parsing issues
+-    $pyArgs = @()
+-    if ($applyTweak) {
+-        $pyArgs += "--tweak"
+-    }
+-    $pyArgs += $targetIP
+-    
+-    Push-Location $iosDir
+-    try {
+-        # Pass array directly to python
+-        & python -u ios_deb_ip_changer_final.py $pyArgs
+-    } catch {
+-        Write-Host "  ❌ Execution error: $_" -ForegroundColor Red
+-    } finally {
+-        Pop-Location
+-    }
+-    
+-    Write-Host ""
+-    Read-Host "Press Enter to return to menu"
+-}
+-
+ function Start-iPhoneUltraSmooth {
+     try { Clear-Host } catch { }
+     Write-Host ""
+     Write-Host "    =====================================================================================" -ForegroundColor Green
+     Write-Host "                          🚀 IPHONE ULTRA-SMOOTH LAUNCHER                             " -ForegroundColor White
+@@ -1766,408 +1669,10 @@ function Resolve-ExecutablePath {
+     }
+ 
+     return $null
+ }
+ 
+-function Start-USBForwarderMode {
+-    try { Clear-Host } catch { }
+-    Write-Host ""
+-    Write-Host "    =====================================================================================" -ForegroundColor Magenta
+-    Write-Host "                  🔌 USB FORWARDER MODE (No Hotspot) - COMBINED SOLUTION                  " -ForegroundColor White
+-    Write-Host "    =====================================================================================" -ForegroundColor Magenta
+-    Write-Host ""
+-
+-    Write-Host "[INFO] Starting USB streaming solution (like Option A, but for USB)..." -ForegroundColor Green
+-    Write-Host ""
+-
+-    # STEP 1: Check Python
+-    Write-Host "[STEP 1/6] 🐍 Checking Python installation..." -ForegroundColor Yellow
+-    $pythonVersion = $null
+-    try {
+-        $pythonVersion = & python --version 2>&1
+-        if ($pythonVersion -match "Python (\d+\.\d+)") {
+-            Write-Host "  ✅ Python is installed: $pythonVersion" -ForegroundColor Green
+-        }
+-    } catch { }
+-
+-    if (-not $pythonVersion) {
+-        Write-Host "  ❌ Python is required for USB Forwarder mode" -ForegroundColor Red
+-        Write-Host "     Please install Python from: https://www.python.org/downloads/" -ForegroundColor Yellow
+-        Read-Host "Press Enter to return to menu..."
+-        return
+-    }
+-
+-    # STEP 2: Check Flask
+-    Write-Host "[STEP 2/6] 📦 Checking Flask installation..." -ForegroundColor Yellow
+-    $flaskInstalled = $false
+-    try {
+-        & python -c "import flask" 2>&1 | Out-Null
+-        if ($LASTEXITCODE -eq 0) {
+-            $flaskInstalled = $true
+-            Write-Host "  ✅ Flask is installed" -ForegroundColor Green
+-        }
+-    } catch { }
+-
+-    if (-not $flaskInstalled) {
+-        Write-Host "  📦 Flask not found. Installing Flask..." -ForegroundColor Yellow
+-        & python -m pip install flask 2>&1 | Out-Null
+-        if ($LASTEXITCODE -eq 0) {
+-            Write-Host "  ✅ Flask installed successfully!" -ForegroundColor Green
+-        } else {
+-            Write-Host "  ❌ Failed to install Flask. Please install manually." -ForegroundColor Red
+-            Read-Host "Press Enter to return to menu..."
+-            return
+-        }
+-    }
+-
+-    # Check usbmux listener script
+-    $usbListener = Join-Path $script:SRSHome "scripts\\usb_usbmux_listener.py"
+-    if (-not (Test-Path $usbListener)) {
+-        Write-Host "  ❌ USB listener script not found: $usbListener" -ForegroundColor Red
+-        Write-Host "     Please ensure scripts\\usb_usbmux_listener.py exists." -ForegroundColor Yellow
+-        Read-Host "Press Enter to return to menu..."
+-        return
+-    }
+-    Write-Host "  ✅ USB listener found: $usbListener" -ForegroundColor Green
+-
+-    # Check .deb
+-    $debPath = Join-Path $script:SRSHome "ios\\modified_debs\\iosvcam_base_127_10_10_10.deb"
+-    if (-not (Test-Path $debPath)) {
+-        Write-Host "  ⚠️  127.10.10.10 .deb not found (optional)" -ForegroundColor Yellow
+-    } else {
+-        Write-Host "  ✅ VCAM .deb found: $debPath" -ForegroundColor Green
+-    }
+-    Write-Host ""
+-
+-    # STEP 3: Clean up ports (like Option A)
+-    Write-Host "[STEP 3/6] 🧹 Cleaning up conflicting processes..." -ForegroundColor Yellow
+-    Clear-SRSPorts
+-
+-    # STEP 4: iPhone Forwarder Install Options
+-    Write-Host ""
+-    Write-Host "  🔐 iPhone Forwarder Install Options:" -ForegroundColor Yellow
+-    Write-Host "      [A] Auto-install over SSH (requires 3uTools SSH tunnel)" -ForegroundColor White
+-    Write-Host "      [M] Manual install steps" -ForegroundColor White
+-    Write-Host "      [S] Skip install (already installed)" -ForegroundColor White
+-    $installChoice = Read-Host "  Choose install option [A/M/S]"
+-
+-    if ($installChoice -and $installChoice.ToUpper() -eq "A") {
+-        Write-Host ""
+-        Write-Host "  📡 OPEN 3uTools SSH TUNNEL FIRST" -ForegroundColor Yellow
+-        Write-Host "  ─────────────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+-        Write-Host "  1. Open 3uTools" -ForegroundColor White
+-        Write-Host "  2. Toolbox → Open SSH Tunnel" -ForegroundColor White
+-        Write-Host "  3. Keep the tunnel window open" -ForegroundColor White
+-        Write-Host "  ─────────────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+-        Write-Host "  If prompted to cache host key, type 'y' and press Enter." -ForegroundColor Gray
+-        Read-Host "  Press Enter once SSH tunnel is open"
+-
+-        $plinkPath = Resolve-ExecutablePath "" "plink.exe"
+-        if (-not $plinkPath) {
+-            $plinkPath = Resolve-ExecutablePath (Read-Host "  Enter path to plink.exe (or folder)") "plink.exe"
+-        }
+-
+-        if (-not $plinkPath) {
+-            Write-Host "  ❌ plink.exe not found. Install PuTTY or provide plink path." -ForegroundColor Red
+-            Read-Host "Press Enter to return to menu..."
+-            return
+-        }
+-
+-        $pscpPath = Resolve-ExecutablePath (Split-Path $plinkPath -Parent) "pscp.exe"
+-        if (-not $pscpPath) {
+-            $pscpPath = Resolve-ExecutablePath (Read-Host "  Enter path to pscp.exe (or folder)") "pscp.exe"
+-        }
+-
+-        if (-not $pscpPath) {
+-            Write-Host "  ❌ pscp.exe not found. Install PuTTY or provide pscp path." -ForegroundColor Red
+-            Read-Host "Press Enter to return to menu..."
+-            return
+-        }
+-
+-        $sshHost = Read-Host "  SSH host [127.0.0.1]"
+-        if ([string]::IsNullOrWhiteSpace($sshHost)) { $sshHost = "127.0.0.1" }
+-
+-        $sshPort = Read-Host "  SSH port [2222]"
+-        if ([string]::IsNullOrWhiteSpace($sshPort)) { $sshPort = "2222" }
+-
+-        $sshUser = Read-Host "  SSH user [root]"
+-        if ([string]::IsNullOrWhiteSpace($sshUser)) { $sshUser = "root" }
+-
+-        $sshPasswordSecure = Read-Host "  Enter SSH/su password" -AsSecureString
+-        $sshPassword = ConvertTo-PlainText $sshPasswordSecure
+-
+-        $hostKey = Read-Host "  Optional host key fingerprint (blank if already trusted)"
+-
+-        $plinkArgs = @("-ssh", "$sshUser@$sshHost", "-P", $sshPort, "-pw", $sshPassword)
+-        $pscpArgs = @("-P", $sshPort, "-pw", $sshPassword)
+-        if (-not [string]::IsNullOrWhiteSpace($hostKey)) {
+-            $plinkArgs += @("-hostkey", $hostKey)
+-            $pscpArgs += @("-hostkey", $hostKey)
+-            $plinkArgs += "-batch"
+-            $pscpArgs += "-batch"
+-        }
+-
+-        $remoteBase = "/var/root"
+-        $remoteFolder = "/var/root/usb_forwarder"
+-        $localForwarder = Join-Path $script:SRSHome "ios\\usb_forwarder"
+-        $localDeb = Join-Path $script:SRSHome "ios\\modified_debs\\vcam_usb_forwarder.deb"
+-
+-        Write-Host ""
+-        Write-Host "  📦 Copying forwarder files to iPhone..." -ForegroundColor Yellow
+-        & $plinkPath @plinkArgs "mkdir -p $remoteBase"
+-
+-        if (Test-Path $localForwarder) {
+-            & $pscpPath @pscpArgs -r $localForwarder "${sshUser}@${sshHost}:$remoteBase/"
+-        } else {
+-            Write-Host "  ⚠️  Forwarder folder not found: $localForwarder" -ForegroundColor Yellow
+-        }
+-
+-        if (Test-Path $localDeb) {
+-            & $pscpPath @pscpArgs $localDeb "${sshUser}@${sshHost}:$remoteBase/vcam_usb_forwarder.deb"
+-        } else {
+-            Write-Host "  ⚠️  Forwarder .deb not found: $localDeb" -ForegroundColor Yellow
+-        }
+-
+-        Write-Host "  🚀 Installing on iPhone..." -ForegroundColor Yellow
+-        & $plinkPath @plinkArgs "mkdir -p /usr/local/share/vcam_usb_forwarder; dpkg -r vcam-usb-forwarder 2>/dev/null || true; dpkg -i /var/root/vcam_usb_forwarder.deb || sh /var/root/usb_forwarder/install.sh; /sbin/ifconfig lo0 alias 127.10.10.10 netmask 255.255.255.255 up 2>/dev/null || true; launchctl unload /Library/LaunchDaemons/com.vcam.usbforwarder.plist 2>/dev/null || true; launchctl load -w /Library/LaunchDaemons/com.vcam.usbforwarder.plist; /usr/bin/killall -9 vcam_usb_forwarder 2>/dev/null || /bin/killall -9 vcam_usb_forwarder 2>/dev/null || true; /usr/local/bin/vcam_usb_forwarder >/var/log/vcam_usb_forwarder.log 2>&1 &"
+-
+-        Write-Host "  ✅ Install attempt complete." -ForegroundColor Green
+-        Write-Host ""
+-    } elseif ($installChoice -and $installChoice.ToUpper() -eq "M") {
+-        Write-Host ""
+-        Write-Host "  MANUAL INSTALL STEPS:" -ForegroundColor Yellow
+-        Write-Host "  1. Open 3uTools → Toolbox → Open SSH Tunnel" -ForegroundColor White
+-        Write-Host "  2. Copy files to iPhone:" -ForegroundColor White
+-        Write-Host "     pscp -r ios\\usb_forwarder root@127.0.0.1:/var/root/" -ForegroundColor Gray
+-        Write-Host "     pscp ios\\modified_debs\\vcam_usb_forwarder.deb root@127.0.0.1:/var/root/" -ForegroundColor Gray
+-        Write-Host "  3. SSH in and install:" -ForegroundColor White
+-        Write-Host "     mkdir -p /usr/local/share/vcam_usb_forwarder" -ForegroundColor Gray
+-        Write-Host "     dpkg -r vcam-usb-forwarder 2>/dev/null || true" -ForegroundColor Gray
+-        Write-Host "     dpkg -i /var/root/vcam_usb_forwarder.deb" -ForegroundColor Gray
+-        Write-Host "     /sbin/ifconfig lo0 alias 127.10.10.10 netmask 255.255.255.255 up" -ForegroundColor Gray
+-        Write-Host "     launchctl unload /Library/LaunchDaemons/com.vcam.usbforwarder.plist 2>/dev/null" -ForegroundColor Gray
+-        Write-Host "     launchctl load -w /Library/LaunchDaemons/com.vcam.usbforwarder.plist" -ForegroundColor Gray
+-        Write-Host "     /usr/bin/killall -9 vcam_usb_forwarder 2>/dev/null || /bin/killall -9 vcam_usb_forwarder" -ForegroundColor Gray
+-        Write-Host "     (fallback) sh /var/root/usb_forwarder/install.sh" -ForegroundColor Gray
+-        Write-Host ""
+-        Read-Host "Press Enter to continue"
+-    }
+-
+-    # STEP 5: Start SRS in new window - ALWAYS (like Option A)
+-    Write-Host ""
+-    Write-Host "[STEP 4/6] 🚀 Launching SRS server in new window..." -ForegroundColor Yellow
+-
+-    # Use SMOOTH PLAYBACK config for USB mode
+-    $configPath = Join-Path $script:SRSHome "config\\active\\srs_usb_smooth_playback.conf"
+-    if (-not (Test-Path $configPath)) {
+-        $configPath = Join-Path $script:SRSHome "config\\active\\srs_iphone_ultra_smooth_dynamic.conf"
+-    }
+-
+-    if (-not (Start-SRSServerWindow -ConfigPath $configPath -DisplayIP "127.0.0.1" -WindowTitle "SRS Media Server - USB Mode")) {
+-        Write-Host "  ❌ Failed to start SRS server" -ForegroundColor Red
+-        Read-Host "Press Enter to return to menu..."
+-        return
+-    }
+-    Write-Host "  ✅ SRS server launched in new window!" -ForegroundColor Green
+-
+-    # Give SRS a moment to start
+-    Start-Sleep -Seconds 2
+-
+-    # STEP 6: Start USB listener in background window
+-    Write-Host "[STEP 5/6] 🔌 Launching USB listener in new window..." -ForegroundColor Yellow
+-    Start-UsbListenerWindow -DevicePort 62080 -LocalPort 62081 -TargetPort 80 -Label "USB Flask Bridge"
+-
+-    # Launch main USB listener in a background window
+-    $usbListenerPath = (Resolve-Path $usbListener).Path
+-    $usbCommand = @"
+-`$Host.UI.RawUI.WindowTitle = 'USB Listener - RTMP Bridge';
+-Write-Host '========================================' -ForegroundColor Magenta;
+-Write-Host '       USB LISTENER - RTMP BRIDGE       ' -ForegroundColor White;
+-Write-Host '========================================' -ForegroundColor Magenta;
+-Write-Host '';
+-Write-Host 'Bridging PC:62001 -> iPhone:62000 -> VCAM' -ForegroundColor Yellow;
+-Write-Host 'OBS streams to: rtmp://127.0.0.1:1935/live/srs' -ForegroundColor Green;
+-Write-Host 'VCAM receives from: rtmp://127.10.10.10:1935/live/srs' -ForegroundColor Green;
+-Write-Host '========================================' -ForegroundColor Magenta;
+-Write-Host '';
+-`$env:PYTHONUNBUFFERED = '1';
+-& python '$usbListenerPath';
+-Write-Host '';
+-Write-Host 'USB Listener stopped. Press any key to close...' -ForegroundColor Yellow;
+-`$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+-"@
+-    Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $usbCommand -WindowStyle Normal
+-    Write-Host "  ✅ USB listener launched in new window!" -ForegroundColor Green
+-
+-    # Give USB listener a moment
+-    Start-Sleep -Seconds 1
+-
+-    # STEP 6: Show success banner and run Flask in current window (like Option A)
+-    Write-Host "[STEP 6/6] 🔐 Starting Flask authentication server..." -ForegroundColor Yellow
+-    Write-Host ""
+-    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
+-    Write-Host "                ✅ ALL USB MODE SERVERS ARE NOW RUNNING!                    " -ForegroundColor Green
+-    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
+-    Write-Host ""
+-    Write-Host "📱 USB Mode Connection Details:" -ForegroundColor Cyan
+-    Write-Host "   OBS Stream To:     rtmp://127.0.0.1:1935/live/srs" -ForegroundColor Yellow
+-    Write-Host "   VCAM App URL:      rtmp://127.10.10.10:1935/live/srs" -ForegroundColor Yellow
+-    Write-Host "   Flask Auth (USB):  http://127.10.10.10:80/ (proxied)" -ForegroundColor Yellow
+-    Write-Host "   Web Console:       http://127.0.0.1:8080/" -ForegroundColor Yellow
+-    Write-Host ""
+-    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
+-    Write-Host ""
+-
+-    # Try to start Flask in a window, otherwise run in current window
+-    if (Start-FlaskAuthServerWindow -HostOverride "127.0.0.1") {
+-        Write-Host ""
+-        Read-Host "Press Enter to return to menu..."
+-        return
+-    }
+-
+-    # Fallback: Run Flask in current window (like Option A)
+-    Write-Host "📌 Flask Authentication Server Output (current window):" -ForegroundColor Green
+-    Write-Host "────────────────────────────────────────" -ForegroundColor DarkGray
+-    Write-Host ""
+-
+-    # Check for server.py
+-    if (-not (Test-Path "server.py")) {
+-        Write-Host "❌ server.py not found!" -ForegroundColor Red
+-        Write-Host "Please ensure server.py is in the current directory." -ForegroundColor Yellow
+-        Read-Host "Press Enter to return to menu..."
+-        return
+-    }
+-
+-    # Create a job for Flask server so we can control it
+-    $flaskJob = Start-Job -ScriptBlock {
+-        param($WorkingDir)
+-        Set-Location $WorkingDir
+-        $env:FLASK_HOST = "127.0.0.1"
+-        & python -u server.py 2>&1
+-    } -ArgumentList $script:SRSHome
+-
+-    Write-Host "Flask server starting on 127.0.0.1:80..." -ForegroundColor Yellow
+-    Start-Sleep -Seconds 1
+-
+-    Write-Host ""
+-    Write-Host "Press [S] to stop Flask server and return to menu" -ForegroundColor Cyan
+-    Write-Host "Press [Q] to quit everything" -ForegroundColor Cyan
+-    Write-Host ""
+-    Write-Host "Flask Server Logs:" -ForegroundColor Green
+-    Write-Host "──────────────────" -ForegroundColor DarkGray
+-
+-    # Monitor Flask output
+-    while ($true) {
+-        if ($flaskJob.State -eq "Completed" -or $flaskJob.State -eq "Failed") {
+-            $output = Receive-Job -Job $flaskJob
+-            if ($output) {
+-                Write-Host $output
+-            }
+-            break
+-        }
+-
+-        # Check for new output
+-        $output = Receive-Job -Job $flaskJob -Keep
+-        if ($output) {
+-            $newOutput = $output | Select-Object -Last 10
+-            foreach ($line in $newOutput) {
+-                Write-Host $line
+-            }
+-        }
+-
+-        # Check for key press (non-blocking)
+-        if ([Console]::KeyAvailable) {
+-            $key = [Console]::ReadKey($true)
+-            if ($key.Key -eq 'S' -or $key.Key -eq 'Q') {
+-                Write-Host ""
+-                Write-Host "Stopping Flask server..." -ForegroundColor Yellow
+-                Stop-Job -Job $flaskJob -ErrorAction SilentlyContinue
+-                Remove-Job -Job $flaskJob -Force -ErrorAction SilentlyContinue
+-
+-                if ($key.Key -eq 'Q') {
+-                    # Also stop SRS
+-                    Get-Process -Name "srs" -ErrorAction SilentlyContinue | Stop-Process -Force
+-                    Write-Host "All servers stopped." -ForegroundColor Green
+-                }
+-                break
+-            }
+-        }
+-
+-        Start-Sleep -Milliseconds 500
+-    }
+-
+-    Read-Host "Press Enter to return to menu..."
+-}
+-
+-function Start-USBHotspotMode {
+-    try { Clear-Host } catch { }
+-    Write-Host ""
+-    Write-Host "    =====================================================================================" -ForegroundColor Magenta
+-    Write-Host "                        📱 USB HOTSPOT MODE (Personal Hotspot)                           " -ForegroundColor White
+-    Write-Host "    =====================================================================================" -ForegroundColor Magenta
+-    Write-Host ""
+-
+-    Write-Host "  This mode streams over USB using iPhone Personal Hotspot." -ForegroundColor Cyan
+-    Write-Host ""
+-    Write-Host "  📋 SETUP INSTRUCTIONS:" -ForegroundColor Yellow
+-    Write-Host "  ─────────────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+-    Write-Host "  1. On iPhone: Go to Settings → Personal Hotspot" -ForegroundColor White
+-    Write-Host "  2. Enable 'Allow Others to Join'" -ForegroundColor White
+-    Write-Host "  3. Connect iPhone to PC via USB cable" -ForegroundColor White
+-    Write-Host "  4. Wait for Windows to detect 'Apple Mobile Device Ethernet'" -ForegroundColor White
+-    Write-Host "  5. The script will auto-detect and provide RTMP URL" -ForegroundColor White
+-    Write-Host "  ─────────────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+-    Write-Host ""
+-    Write-Host "  ⚠️  REQUIREMENTS:" -ForegroundColor Yellow
+-    Write-Host "      • iTunes must be installed (for Apple USB drivers)" -ForegroundColor Gray
+-    Write-Host "      • iPhone Personal Hotspot enabled" -ForegroundColor Gray
+-    Write-Host "      • USB cable connected" -ForegroundColor Gray
+-    Write-Host ""
+-
+-    # Check Python
+-    $pythonVersion = $null
+-    try {
+-        $pythonVersion = & python --version 2>&1
+-    } catch { }
+-
+-    if (-not $pythonVersion) {
+-        Write-Host "  ❌ Python is required for USB Streaming mode" -ForegroundColor Red
+-        Write-Host "     Please install Python from: https://www.python.org/downloads/" -ForegroundColor Yellow
+-        Read-Host "Press Enter to return to menu..."
+-        return
+-    }
+-
+-    # Check if USB tethering script exists
+-    $usbScript = Join-Path $script:SRSHome "scripts\usb_tethering_monitor.py"
+-    if (-not (Test-Path $usbScript)) {
+-        Write-Host "  ❌ USB streaming script not found: $usbScript" -ForegroundColor Red
+-        Write-Host "     Please ensure the scripts folder contains usb_tethering_monitor.py" -ForegroundColor Yellow
+-        Read-Host "Press Enter to return to menu..."
+-        return
+-    }
+-
+-    Write-Host "  ✅ Python found: $pythonVersion" -ForegroundColor Green
+-    Write-Host "  ✅ USB script found: $usbScript" -ForegroundColor Green
+-    Write-Host ""
+-    Write-Host "  🚀 Starting USB Streaming Monitor..." -ForegroundColor Green
+-    Write-Host "     Press Ctrl+C in the Python window to stop" -ForegroundColor Gray
+-    Write-Host ""
+-
+-    # Launch the Python script
+-    try {
+-        $env:PYTHONUNBUFFERED = "1"
+-        & python $usbScript --srs-home $script:SRSHome
+-    } catch {
+-        Write-Host "  ❌ Error running USB streaming script:" -ForegroundColor Red
+-        Write-Host "     $($_.Exception.Message)" -ForegroundColor Yellow
+-    } finally {
+-        Remove-Item Env:\PYTHONUNBUFFERED -ErrorAction SilentlyContinue
+-    }
+-
+-    Read-Host "Press Enter to return to menu..."
+-}
+-
+ function Show-USBValidation {
+     param(
+         [switch]$Auto
+     )
+ 
+@@ -3607,22 +3112,21 @@ try {
+ 
+     Get-NetworkInfo
+ 
+     do {
+         Show-MainMenu
+-        $choice = Read-Host "Choose option [1-9, U, T, C, Q]"
++        $choice = Read-Host "Choose option [A, B, 1, 3-9, C, Q]"
+ 
+         if ([string]::IsNullOrEmpty($choice)) {
+             $choice = "Q"
+         }
+ 
+         try {
+             switch ($choice.ToUpper()) {
+                 "A" { Start-CombinedFlaskAndSRS }
+                 "B" { Start-CombinedFlaskAndSRS-SRS }  # Legacy SRS mode (direct, bypasses engine check)
+                 "1" { Start-FlaskAuthServer }
+-                "2" { Show-EnhancedDebBuilder }
+                 "3" { Show-ConfigSelector }
+                 "4" { Show-SystemDiagnostics }
+                 "5" {
+                     Write-Host "Cleaning up ports..." -ForegroundColor Yellow
+                     Clear-SRSPorts
+@@ -3630,12 +3134,10 @@ try {
+                 }
+                 "6" { Get-NetworkInfo; Read-Host "Network detection refreshed. Press Enter to continue" }
+                 "7" { Copy-RTMPUrlToClipboard }
+                 "8" { Show-iOSDebCreator }
+                 "9" { Show-USBValidation }
+-                "U" { Start-USBForwarderMode }
+-                "T" { Start-USBHotspotMode }
+                 "C" { Show-ConfigurationSettings }
+                 "Q" {
+                     Write-Host ""
+                     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
+                     Write-Host "                     🎉 Thank you for using SRS Ultimate Launcher!                      " -BackgroundColor DarkGreen -ForegroundColor White

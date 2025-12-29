@@ -1,0 +1,78 @@
+```json
+[
+  {
+    "severity": "HIGH",
+    "title": "Here-strings appear single-quoted, preventing variable expansion",
+    "details": "If the commands shown live inside a single-quoted here-string (@' ... '@), PowerShell will not expand $script:SRSHome, $monibucaPath, $configFullPath, or $plinkPath. The executed commands will literally include '$script:SRSHome' and '$monibucaPath', causing Set-Location and the executable invocations to fail.",
+    "file": "unknown",
+    "line": "unknown",
+    "recommendation": "Use a double-quoted here-string (@\" ... \"@) or build the script text with interpolated variables before passing it to SSH/Invoke-Expression. Verify variables by echoing the resolved command string before execution."
+  },
+  {
+    "severity": "HIGH",
+    "title": "Set-Location path is quoted as a literal string",
+    "details": "Set-Location '$script:SRSHome' uses single quotes, so even outside a here-string, it treats the path as a literal string. That will not resolve to the intended directory and will fail unless a directory literally named $script:SRSHome exists.",
+    "file": "unknown",
+    "line": "unknown",
+    "recommendation": "Use Set-Location $script:SRSHome (no quotes) or Set-Location \"$script:SRSHome\" (double quotes)."
+  },
+  {
+    "severity": "HIGH",
+    "title": "Executable paths are quoted as literals, so processes may not start",
+    "details": "The Monibuca and plink invocations use '& '$monibucaPath'' and '& '$plinkPath''. Single quotes prevent variable expansion; the call operator receives a literal string '$monibucaPath' or '$plinkPath', so the executable is not found.",
+    "file": "unknown",
+    "line": "unknown",
+    "recommendation": "Use & $monibucaPath and & $plinkPath (or double-quoted if needed)."
+  },
+  {
+    "severity": "MEDIUM",
+    "title": "Config path passed to Monibuca is literal",
+    "details": "The -c '$configFullPath' argument will be the literal text $configFullPath instead of the actual path if single-quoted or inside a single-quoted here-string.",
+    "file": "unknown",
+    "line": "unknown",
+    "recommendation": "Pass -c $configFullPath or -c \"$configFullPath\"."
+  },
+  {
+    "severity": "MEDIUM",
+    "title": "Logic does not verify Flask/Monibuca actually started",
+    "details": "Even with correct expansion, the snippet does not check process exit codes, listen ports, or health endpoints. Failures (missing python, port 80 in use, bad config) can be silent.",
+    "file": "unknown",
+    "line": "unknown",
+    "recommendation": "Capture $LASTEXITCODE, check process objects, and probe ports (e.g., Test-NetConnection) with retries before continuing."
+  },
+  {
+    "severity": "MEDIUM",
+    "title": "Potential port binding and privilege issues for Flask on port 80",
+    "details": "Binding to port 80 may require elevation; in a restricted environment Flask may fail immediately. If started via SSH with no PTY, failures may be swallowed without checks.",
+    "file": "unknown",
+    "line": "unknown",
+    "recommendation": "Add explicit error handling and fallback port or pre-flight privilege/port checks."
+  },
+  {
+    "severity": "MEDIUM",
+    "title": "Race condition: SSH tunnel may start before Flask is listening",
+    "details": "If the tunnel is created immediately after launching Flask, there is a window where the remote side connects but localhost:80 is not yet accepting connections, leading to failed pairing/RTMP flows.",
+    "file": "unknown",
+    "line": "unknown",
+    "recommendation": "Add a wait loop for Flask readiness (TCP connect or HTTP health check) before opening the tunnel."
+  },
+  {
+    "severity": "LOW",
+    "title": "Race condition: Monibuca may depend on working directory or config availability",
+    "details": "If Set-Location fails due to quoting issues, Monibuca may run in an unexpected directory and fail to resolve relative paths or config includes.",
+    "file": "unknown",
+    "line": "unknown",
+    "recommendation": "Ensure Set-Location succeeds and use full paths; verify config file exists before launch."
+  },
+  {
+    "severity": "LOW",
+    "title": "Error handling incomplete around SSH/plink execution",
+    "details": "The SSH command uses -batch but no retries/backoff and no capture of stderr; failures (auth, network) may be missed.",
+    "file": "unknown",
+    "line": "unknown",
+    "recommendation": "Capture output, check $LASTEXITCODE, and implement retry logic with timeouts."
+  }
+]
+```
+
+Summary: The likely root cause is single-quoted here-strings or single quotes around variables, which prevents expansion and causes Set-Location and executable invocations to use literal strings. As written, Flask/Monibuca/plink may not start at all. Even after fixing expansion, add explicit readiness checks and exit-code handling to avoid silent failures and race conditions.

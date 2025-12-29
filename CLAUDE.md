@@ -56,11 +56,11 @@ curl http://localhost:1985/api/v1/versions
 
 ### Core Components
 
-1. **PowerShell Launcher (`iOS-VCAM-Launcher.ps1`)** - ~2150 lines
+1. **PowerShell Launcher (`iOS-VCAM-Launcher.ps1`)** - ~3550 lines
    - Network adapter detection with IP monitoring
    - Dynamic IP replacement via regex in configs
-   - Interactive menu with server status
-   - Process management for SRS and Flask
+   - Interactive menu with server status (options: A, B, 1, 3-9, U, C, Q)
+   - Process management for SRS/Monibuca and Flask
 
 2. **SRS Media Server (`objs/srs.exe`)**
    - RTMP: 1935, HTTP/HLS: 8080, API: 1985
@@ -78,10 +78,12 @@ curl http://localhost:1985/api/v1/versions
 |----------|------|---------|
 | `Get-NetworkInfo` | ~399 | WMI network detection |
 | `Update-SRSConfigForNewIP` | ~570 | IP placeholder replacement |
-| `Show-MainMenu` | ~605 | Interactive menu loop |
-| `Start-SRSServer` | ~1107 | Process lifecycle management |
-| `Invoke-DebrandedIOSBuild` | ~1319 | Calls Python debranding tools |
-| `Show-ConfigSelector` | ~1646 | Configuration profile picker |
+| `Show-MainMenu` | ~605 | Interactive menu display |
+| `Start-CombinedFlaskAndSRS` | ~740 | Main streaming launcher |
+| `Start-MonibucaViaSshUsb` | ~1312 | USB streaming via SSH tunnel (option U) |
+| `Show-iOSDebCreator` | ~2463 | iOS .deb builder (option 8) |
+| `Show-ConfigSelector` | ~2714 | Configuration profile picker |
+| `Show-ConfigurationSettings` | ~3261 | Settings menu (option C) |
 
 ### Configuration System
 
@@ -96,6 +98,26 @@ hls_window      3-6;     # Segments in playlist (lower = less buffer)
 queue_length    1-3;     # RTMP buffer depth
 mw_latency      100-500; # Target latency in ms
 ```
+
+### USB Streaming via SSH Tunnel (Option U)
+
+Stream RTMP from iPhone to PC over USB cable using SSH reverse tunneling. Eliminates WiFi dependency for stable, low-latency streaming.
+
+**Prerequisites:**
+- `iproxy.exe` and `idevice_id.exe` at `C:\iProxy\` (libimobiledevice)
+- `plink.exe` in project root (PuTTY suite)
+- OpenSSH installed on jailbroken iPhone
+- iPhone .deb patched with `127.10.10.10` IP address
+
+**How it works:**
+1. iproxy forwards `localhost:2222 → iPhone:22` over USB
+2. SSH reverse tunnel makes iPhone's port 1935 route back to PC's Monibuca
+3. iPhone app connects to `rtmp://127.10.10.10:1935/live/srs`
+4. Traffic flows: iPhone → SSH tunnel → USB → PC Monibuca
+
+**Files:**
+- Pre-built .deb: `ios/modified_debs/iosvcam_base_127_10_10_10.deb`
+- Full docs: `tasks/USB-SSH-STREAMING-GUIDE.md`
 
 ### iOS .deb Package System
 
@@ -132,6 +154,48 @@ Debranding patterns:
 3. **Network detection fails**: Manually select adapter in launcher menu
 4. **Execution policy**: Always use `-ExecutionPolicy Bypass`
 
+## PowerShell Here-String Pitfalls (CRITICAL)
+
+When using here-strings (`@"..."@`) to build commands for `Start-Process`, variables inside single quotes will NOT expand:
+
+```powershell
+# ❌ BROKEN - Single quotes prevent expansion
+$psCommand = @"
+Set-Location '$script:SRSHome';        # Becomes literal '$script:SRSHome'
+& '$monibucaPath' -c '$configPath';    # Process won't find executable
+"@
+
+# ✅ CORRECT - Double quotes allow expansion
+$psCommand = @"
+Set-Location "$script:SRSHome";        # Expands to actual path
+& "$monibucaPath" -c "$configPath";    # Works correctly
+"@
+```
+
+**Rule:** In double-quoted here-strings:
+- `$variable` → expands ✅
+- `"$variable"` → expands ✅
+- `'$variable'` → does NOT expand ❌
+
+**Exception:** Keep single quotes for literal SSH remote commands:
+```powershell
+# The remote command should NOT be expanded by PowerShell
+& "$plinkPath" -ssh root@host 'echo TUNNEL_ACTIVE; cat'
+#                              └── Stays literal for iPhone shell
+```
+
+## SSH Tunnel Keep-Alive (CRITICAL)
+
+plink reverse tunnels require a running command or they die immediately:
+
+```powershell
+# ❌ BROKEN - Tunnel connects but closes immediately, ports don't bind
+plink.exe -ssh -R 127.0.0.1:80:localhost:80 root@host
+
+# ✅ CORRECT - 'cat' keeps session alive forever
+plink.exe -ssh -batch -R 127.0.0.1:80:localhost:80 root@host 'echo CONNECTED; cat'
+```
+
 ## Debug Mode
 
 Enable verbose SRS logging:
@@ -139,6 +203,25 @@ Enable verbose SRS logging:
 srs_log_tank    console;
 srs_log_level   trace;
 ```
+
+## Documentation (KEEP UPDATED)
+
+User-facing wiki documentation lives in `docs/`:
+
+| File | Purpose |
+|------|---------|
+| `Home.md` | Wiki index with navigation |
+| `Installation.md` | Prerequisites and setup guide |
+| `Configuration.md` | SRS config profiles and parameters |
+| `Streaming-Guide.md` | WiFi/USB streaming howto |
+| `Troubleshooting.md` | Common issues and fixes |
+| `Advanced-Features.md` | SSH, debranding, Frida, architecture |
+
+**Maintenance Rules:**
+- When menu options change, update references in docs (e.g., "Option [3]")
+- When adding features, update relevant wiki page
+- Keep `Home.md` ToC in sync with actual pages
+- Review docs after any launcher refactoring
 
 ## Commit Guidelines
 
