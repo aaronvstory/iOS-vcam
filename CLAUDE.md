@@ -81,9 +81,9 @@ curl http://localhost:1985/api/v1/versions
 | `Show-MainMenu` | ~605 | Interactive menu display |
 | `Start-CombinedFlaskAndSRS` | ~740 | Main streaming launcher |
 | `Start-MonibucaViaSshUsb` | ~1312 | USB streaming via SSH tunnel (option U) |
-| `Show-ConfigSelector` | ~1880 | Configuration profile picker |
-| `Show-iOSDebCreator` | ~2630 | iOS .deb builder (option 8) |
-| `Show-ConfigurationSettings` | ~3200 | Settings menu (option C) |
+| `Show-iOSDebCreator` | ~2463 | iOS .deb builder (option 8) |
+| `Show-ConfigSelector` | ~2714 | Configuration profile picker |
+| `Show-ConfigurationSettings` | ~3261 | Settings menu (option C) |
 
 ### Configuration System
 

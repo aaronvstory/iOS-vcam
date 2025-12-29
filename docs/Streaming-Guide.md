@@ -4,9 +4,9 @@ This guide covers how to stream video from your PC to your iPhone using iOS-VCAM
 
 ## 📡 Method 1: WiFi Streaming (Easiest)
 
-1.  **Connect Devices:** Ensure your PC and iPhone are on the **same WiFi network**. (5GHz recommended).
+1.  **Connect Devices:** Ensure your PC and iPhone are on the **same WiFi network**. (5 GHz recommended).
 2.  **Start Server:** Run `iOS-VCAM-Launcher.exe`.
-3.  **Select Profile:** Choose **Option [Q]** (Quick Start) or select a profile like `srs_iphone_ultra_smooth_dynamic.conf`.
+3.  **Select Profile:** Choose **Option [A]** (Main Streaming) or select a profile like `srs_iphone_ultra_smooth_dynamic.conf`.
 4.  **Get URL:** The launcher will display an RTMP URL, e.g., `rtmp://192.168.1.50:1935/live/srs`.
 5.  **Configure Source:**
     *   **OBS Studio:** Set "Stream" > "Service" to Custom. Server: `rtmp://192.168.1.50:1935/live/`, Key: `srs`.
@@ -22,11 +22,26 @@ This guide covers how to stream video from your PC to your iPhone using iOS-VCAM
 
 For professional or long-term use, USB is superior due to zero interference and high bandwidth.
 
-### Prerequisites
+### Option [U]: Automated USB Streaming (Recommended)
+
+The launcher now includes **Option [U]** which automates the entire USB streaming setup:
+1.  Connect iPhone via USB cable
+2.  Run `iOS-VCAM-Launcher.exe` and choose **Option [U]**
+3.  Enter SSH password when prompted (default: `alpine`)
+4.  Three windows will launch automatically: iProxy, SSH Tunnel, and Monibuca
+5.  Configure iPhone with URL: `rtmp://127.10.10.10:1935/live/srs`
+
+This method uses SSH reverse tunneling and requires the special `.deb` package with IP `127.10.10.10`.
+
+### Manual USB Setup (Alternative)
+
+If Option [U] doesn't work for your setup, you can configure USB streaming manually:
+
+#### Prerequisites
 *   `libimobiledevice` (specifically `iproxy.exe`) installed on PC.
 *   iPhone connected via USB.
 
-### Setup Steps
+#### Setup Steps
 1.  **Port Forwarding:**
     Open a command prompt and run:
     ```cmd

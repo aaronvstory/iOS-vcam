@@ -20,8 +20,9 @@
 *   **Cause:** `iproxy` not running or cable issue.
 *   **Fix:**
     *   Run `idevice_id -l` to confirm detection.
-    *   Ensure `iproxy 1935 1935` is running in a visible terminal window.
-    *   Re-plug USB cable.
+    *   For **Option [U]**: Check all three windows (iProxy, SSH, Monibuca) for errors.
+    *   For manual setup: Ensure `iproxy 2222 22` (for SSH) or `iproxy 1935 1935` is running.
+    *   Re-plug USB cable and accept "Trust This Computer" on iPhone.
 
 ---
 
