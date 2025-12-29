@@ -672,12 +672,8 @@ function Show-MainMenu {
     Write-Host "╚═══════════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Green
     Write-Host ""
 
-    # USB Streaming - Primary/Recommended option with special highlighting
-    Write-Host "    ╔══════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Yellow
-    Write-Host "    ║  " -NoNewline -ForegroundColor Yellow
-    Write-Host "[U] 🔌 USB STREAMING (SSH Tunnel) - RECOMMENDED                        " -NoNewline -ForegroundColor Black -BackgroundColor Yellow
-    Write-Host "  ║" -ForegroundColor Yellow
-    Write-Host "    ╚══════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Yellow
+    # USB Streaming - Primary/Recommended option
+    Write-Host "  [U] 🔌 USB STREAMING (SSH Tunnel) - RECOMMENDED" -ForegroundColor Yellow
     Write-Host "      • Most stable - direct USB connection, no WiFi needed" -ForegroundColor Gray
     Write-Host "      • Low latency, reliable for production streaming" -ForegroundColor Gray
     Write-Host "      • Requires: OpenSSH on iPhone + iproxy + plink" -ForegroundColor DarkGray
