@@ -1371,7 +1371,7 @@ function Stop-UsbStreamingProcesses {
             if ($connections) {
                 foreach ($conn in $connections) {
                     $proc = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
-                    if ($proc -and $proc.ProcessName -eq "python") {
+                    if ($proc -and $proc.ProcessName -match 'python|pythonw|py') {
                         try {
                             if (-not $Silent) { Write-Host "  🔥 Stopping Flask/Python on port $port (PID: $($proc.Id))" -ForegroundColor Red }
                             Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
@@ -1439,104 +1439,111 @@ function Start-MonibucaViaSshUsb {
     Write-Host "    =====================================================================================" -ForegroundColor Magenta
     Write-Host ""
 
-    # Quick device scan for menu display
-    $ideviceIdPath = "C:\iProxy\idevice_id.exe"
-    $quickDevices = @()
-    try {
-        $quickScan = & $ideviceIdPath -l 2>&1
-        if ($quickScan -and $LASTEXITCODE -eq 0) {
-            $quickDevices = @($quickScan -split "`r`n|`n|`r" | ForEach-Object { $_.Trim() } | Where-Object { $_ -match "^[a-fA-F0-9\-]+$" })
-        }
-    } catch { }
-    $deviceCount = $quickDevices.Count
-    $deviceStatus = if ($deviceCount -eq 0) { "❌ No device" } elseif ($deviceCount -eq 1) { "📱 1 device" } else { "📱 $deviceCount devices" }
-
-    # Show sub-menu for USB streaming options
-    Write-Host "  Options:                              $deviceStatus" -ForegroundColor Cyan
-    Write-Host "     [1] Start USB Streaming (default)" -ForegroundColor White
-    Write-Host "     [K] Kill All Processes & Restart Fresh" -ForegroundColor Yellow
-    Write-Host "     [S] Status - Show Running Processes" -ForegroundColor Gray
-    Write-Host "     [Q] Back to Main Menu" -ForegroundColor Gray
-    Write-Host ""
-    $usbChoice = Read-Host "     Select option (1/K/S/Q) [1]"
-    if ([string]::IsNullOrWhiteSpace($usbChoice)) { $usbChoice = "1" }
-    $usbChoice = $usbChoice.ToUpper().Trim()
-
-    switch ($usbChoice) {
-        "Q" {
-            return
-        }
-        "K" {
-            Write-Host ""
-            Stop-UsbStreamingProcesses
-            Write-Host "  🔄 Restarting USB streaming..." -ForegroundColor Cyan
-            Write-Host ""
-            Start-Sleep -Seconds 1
-            # Continue to start fresh
-        }
-        "S" {
-            Write-Host ""
-            Write-Host "  📊 USB Streaming Process Status:" -ForegroundColor Cyan
-            Write-Host ""
-
-            # Check iproxy
-            $iproxyProcs = Get-Process -Name "iproxy" -ErrorAction SilentlyContinue
-            if ($iproxyProcs) {
-                Write-Host "  ✅ iproxy: Running (PIDs: $($iproxyProcs.Id -join ', '))" -ForegroundColor Green
-            } else {
-                Write-Host "  ⬚  iproxy: Not running" -ForegroundColor Gray
+    # Sub-menu loop (avoids recursion for stack safety)
+    :menuLoop while ($true) {
+        # Quick device scan for menu display
+        $ideviceIdPath = "C:\iProxy\idevice_id.exe"
+        $quickDevices = @()
+        try {
+            $quickScan = & $ideviceIdPath -l 2>&1
+            if ($quickScan -and $LASTEXITCODE -eq 0) {
+                $quickDevices = @($quickScan -split "`r`n|`n|`r" | ForEach-Object { $_.Trim() } | Where-Object { $_ -match "^[a-fA-F0-9\-]+$" })
             }
+        } catch { }
+        $deviceCount = $quickDevices.Count
+        $deviceStatus = if ($deviceCount -eq 0) { "❌ No device" } elseif ($deviceCount -eq 1) { "📱 1 device" } else { "📱 $deviceCount devices" }
 
-            # Check plink
-            $plinkProcs = Get-Process -Name "plink" -ErrorAction SilentlyContinue
-            if ($plinkProcs) {
-                Write-Host "  ✅ plink: Running (PIDs: $($plinkProcs.Id -join ', '))" -ForegroundColor Green
-            } else {
-                Write-Host "  ⬚  plink: Not running" -ForegroundColor Gray
+        # Show sub-menu for USB streaming options
+        Write-Host "  Options:                              $deviceStatus" -ForegroundColor Cyan
+        Write-Host "     [1] Start USB Streaming (default)" -ForegroundColor White
+        Write-Host "     [K] Kill All Processes & Restart Fresh" -ForegroundColor Yellow
+        Write-Host "     [S] Status - Show Running Processes" -ForegroundColor Gray
+        Write-Host "     [Q] Back to Main Menu" -ForegroundColor Gray
+        Write-Host ""
+        $usbChoice = Read-Host "     Select option (1/K/S/Q) [1]"
+        if ([string]::IsNullOrWhiteSpace($usbChoice)) { $usbChoice = "1" }
+        $usbChoice = $usbChoice.ToUpper().Trim()
+
+        switch ($usbChoice) {
+            "Q" {
+                return
             }
-
-            # Check Monibuca
-            $monibucaProcs = Get-Process -Name "monibuca" -ErrorAction SilentlyContinue
-            if ($monibucaProcs) {
-                Write-Host "  ✅ Monibuca: Running (PIDs: $($monibucaProcs.Id -join ', '))" -ForegroundColor Green
-            } else {
-                Write-Host "  ⬚  Monibuca: Not running" -ForegroundColor Gray
+            "K" {
+                Write-Host ""
+                Stop-UsbStreamingProcesses
+                Write-Host "  🔄 Restarting USB streaming..." -ForegroundColor Cyan
+                Write-Host ""
+                Start-Sleep -Seconds 1
+                break menuLoop  # Exit loop to start streaming
             }
+            "S" {
+                Write-Host ""
+                Write-Host "  📊 USB Streaming Process Status:" -ForegroundColor Cyan
+                Write-Host ""
 
-            # Check Flask on port 80
-            try {
-                $flask80 = Get-NetTCPConnection -LocalPort 80 -ErrorAction SilentlyContinue
-                if ($flask80) {
-                    $proc = Get-Process -Id $flask80[0].OwningProcess -ErrorAction SilentlyContinue
-                    Write-Host "  ✅ Port 80: $($proc.ProcessName) (PID: $($flask80[0].OwningProcess))" -ForegroundColor Green
+                # Check iproxy
+                $iproxyProcs = Get-Process -Name "iproxy" -ErrorAction SilentlyContinue
+                if ($iproxyProcs) {
+                    Write-Host "  ✅ iproxy: Running (PIDs: $($iproxyProcs.Id -join ', '))" -ForegroundColor Green
                 } else {
-                    Write-Host "  ⬚  Port 80: Not in use" -ForegroundColor Gray
+                    Write-Host "  ⬚  iproxy: Not running" -ForegroundColor Gray
                 }
-            } catch {
-                Write-Host "  ⬚  Port 80: Could not check" -ForegroundColor Gray
-            }
 
-            # Check RTMP port 1935
-            try {
-                $rtmp = Get-NetTCPConnection -LocalPort 1935 -ErrorAction SilentlyContinue
-                if ($rtmp) {
-                    $proc = Get-Process -Id $rtmp[0].OwningProcess -ErrorAction SilentlyContinue
-                    Write-Host "  ✅ Port 1935: $($proc.ProcessName) (PID: $($rtmp[0].OwningProcess))" -ForegroundColor Green
+                # Check plink
+                $plinkProcs = Get-Process -Name "plink" -ErrorAction SilentlyContinue
+                if ($plinkProcs) {
+                    Write-Host "  ✅ plink: Running (PIDs: $($plinkProcs.Id -join ', '))" -ForegroundColor Green
                 } else {
-                    Write-Host "  ⬚  Port 1935: Not in use" -ForegroundColor Gray
+                    Write-Host "  ⬚  plink: Not running" -ForegroundColor Gray
                 }
-            } catch {
-                Write-Host "  ⬚  Port 1935: Could not check" -ForegroundColor Gray
-            }
 
-            Write-Host ""
-            Read-Host "Press Enter to continue..."
-            # Recurse back to show menu again
-            Start-MonibucaViaSshUsb
-            return
-        }
-        default {
-            # Default is "1" - continue to start streaming
+                # Check Monibuca
+                $monibucaProcs = Get-Process -Name "monibuca" -ErrorAction SilentlyContinue
+                if ($monibucaProcs) {
+                    Write-Host "  ✅ Monibuca: Running (PIDs: $($monibucaProcs.Id -join ', '))" -ForegroundColor Green
+                } else {
+                    Write-Host "  ⬚  Monibuca: Not running" -ForegroundColor Gray
+                }
+
+                # Check Flask on port 80 (filter for Listen state)
+                try {
+                    $flask80 = Get-NetTCPConnection -LocalPort 80 -State Listen -ErrorAction SilentlyContinue
+                    if ($flask80) {
+                        $proc = Get-Process -Id $flask80[0].OwningProcess -ErrorAction SilentlyContinue
+                        Write-Host "  ✅ Port 80: $($proc.ProcessName) (PID: $($flask80[0].OwningProcess))" -ForegroundColor Green
+                    } else {
+                        Write-Host "  ⬚  Port 80: Not listening" -ForegroundColor Gray
+                    }
+                } catch {
+                    Write-Host "  ⬚  Port 80: Could not check" -ForegroundColor Gray
+                }
+
+                # Check RTMP port 1935 (filter for Listen state)
+                try {
+                    $rtmp = Get-NetTCPConnection -LocalPort 1935 -State Listen -ErrorAction SilentlyContinue
+                    if ($rtmp) {
+                        $proc = Get-Process -Id $rtmp[0].OwningProcess -ErrorAction SilentlyContinue
+                        Write-Host "  ✅ Port 1935: $($proc.ProcessName) (PID: $($rtmp[0].OwningProcess))" -ForegroundColor Green
+                    } else {
+                        Write-Host "  ⬚  Port 1935: Not listening" -ForegroundColor Gray
+                    }
+                } catch {
+                    Write-Host "  ⬚  Port 1935: Could not check" -ForegroundColor Gray
+                }
+
+                Write-Host ""
+                Read-Host "Press Enter to continue..."
+                try { Clear-Host } catch { }
+                Write-Host ""
+                Write-Host "    =====================================================================================" -ForegroundColor Magenta
+                Write-Host "                      🔌 USB STREAMING VIA SSH REVERSE TUNNEL                           " -ForegroundColor White
+                Write-Host "    =====================================================================================" -ForegroundColor Magenta
+                Write-Host ""
+                continue menuLoop  # Loop back to menu (no recursion!)
+            }
+            default {
+                break menuLoop  # Default "1" - exit loop to start streaming
+            }
         }
     }
 
@@ -2078,14 +2085,27 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
     Write-Host "  ⏳ Waiting for SSH connection..." -ForegroundColor Gray
     Start-Sleep -Seconds 5
 
-    # Verify plink process started
+    # Verify plink process started AND stays alive
     $plinkProcs = Get-Process -Name "plink" -ErrorAction SilentlyContinue
     if ($plinkProcs) {
-        Write-Host "  ✅ SSH tunnel process running" -ForegroundColor Green
-        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel process OK"
+        Write-Host "  ✅ SSH tunnel process started (PID: $($plinkProcs.Id -join ', '))" -ForegroundColor Green
+
+        # Brief liveness check - plink can die immediately if auth fails or host key issues
+        Start-Sleep -Seconds 2
+        $plinkStillAlive = Get-Process -Name "plink" -ErrorAction SilentlyContinue
+        if ($plinkStillAlive) {
+            Write-Host "  ✅ SSH tunnel confirmed stable" -ForegroundColor Green
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel OK - plink alive after liveness check"
+        } else {
+            Write-Host "  ⚠️ SSH tunnel died shortly after starting!" -ForegroundColor Yellow
+            Write-Host "     Check: iPhone connected? SSH password correct? Host key accepted?" -ForegroundColor Gray
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel DIED - plink exited after startup"
+            $allReady = $false
+        }
     } else {
-        Write-Host "  ⚠️ SSH tunnel may have failed - check yellow window" -ForegroundColor Yellow
-        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel process NOT FOUND"
+        Write-Host "  ⚠️ SSH tunnel failed to start" -ForegroundColor Yellow
+        Write-Host "     Check: plink.exe exists? iproxy running? iPhone connected?" -ForegroundColor Gray
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel FAILED - plink process NOT FOUND"
         $allReady = $false
     }
     Write-Host ""
