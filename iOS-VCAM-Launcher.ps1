@@ -1439,8 +1439,20 @@ function Start-MonibucaViaSshUsb {
     Write-Host "    =====================================================================================" -ForegroundColor Magenta
     Write-Host ""
 
+    # Quick device scan for menu display
+    $ideviceIdPath = "C:\iProxy\idevice_id.exe"
+    $quickDevices = @()
+    try {
+        $quickScan = & $ideviceIdPath -l 2>&1
+        if ($quickScan -and $LASTEXITCODE -eq 0) {
+            $quickDevices = @($quickScan -split "`r`n|`n|`r" | ForEach-Object { $_.Trim() } | Where-Object { $_ -match "^[a-fA-F0-9\-]+$" })
+        }
+    } catch { }
+    $deviceCount = $quickDevices.Count
+    $deviceStatus = if ($deviceCount -eq 0) { "❌ No device" } elseif ($deviceCount -eq 1) { "📱 1 device" } else { "📱 $deviceCount devices" }
+
     # Show sub-menu for USB streaming options
-    Write-Host "  Options:" -ForegroundColor Cyan
+    Write-Host "  Options:                              $deviceStatus" -ForegroundColor Cyan
     Write-Host "     [1] Start USB Streaming (default)" -ForegroundColor White
     Write-Host "     [K] Kill All Processes & Restart Fresh" -ForegroundColor Yellow
     Write-Host "     [S] Status - Show Running Processes" -ForegroundColor Gray
@@ -1882,29 +1894,16 @@ function Start-MonibucaViaSshUsb {
     Write-Host ""
 
     # ============================================================================
-    # STEP 6: Launch iproxy (USB SSH forwarding)
+    # STEP 6: Launch iproxy (USB SSH forwarding) - HIDDEN
     # ============================================================================
     Write-Host "[STEP 6/9] 🚀 Starting iproxy (USB → SSH forwarding)..." -ForegroundColor Yellow
 
+    # Run iproxy hidden - it just forwards ports, no user interaction needed
     $iproxyCommand = @"
-`$Host.UI.RawUI.WindowTitle = 'iProxy - USB SSH$deviceFriendlyName';
-Write-Host '========================================' -ForegroundColor Cyan;
-Write-Host '    iProxy USB Port Forwarding         ' -ForegroundColor White;
-Write-Host '========================================' -ForegroundColor Cyan;
-Write-Host '';
-Write-Host 'Forwarding: localhost:2222 -> iPhone:22' -ForegroundColor Yellow;
-Write-Host 'Device: $selectedUDID$deviceFriendlyName' -ForegroundColor Gray;
-Write-Host '';
-Write-Host 'Keep this window open!' -ForegroundColor Green;
-Write-Host '========================================' -ForegroundColor Cyan;
-Write-Host '';
-& '$iproxyPath' 2222 22 '$selectedUDID';
-Write-Host '';
-Write-Host 'iProxy stopped. Press any key to close...' -ForegroundColor Yellow;
-`$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+& "$iproxyPath" 2222 22 "$selectedUDID"
 "@
 
-    Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $iproxyCommand -WindowStyle Normal
+    Start-Process powershell -ArgumentList "-ExecutionPolicy", "Bypass", "-Command", $iproxyCommand -WindowStyle Hidden
 
     # Wait for iproxy process to start (USB forwarding doesn't show as TCP listener)
     $timeout = 10
@@ -1930,28 +1929,13 @@ Write-Host 'iProxy stopped. Press any key to close...' -ForegroundColor Yellow;
     # ============================================================================
     Write-Host "[STEP 7/9] 🌐 Starting Flask auth server (port 80)..." -ForegroundColor Yellow
 
+    # Run Flask hidden - just serves HTTP auth, no user interaction needed
     $flaskCommand = @"
-`$Host.UI.RawUI.WindowTitle = 'Flask - HTTP Auth Server';
-Write-Host '========================================' -ForegroundColor Blue;
-Write-Host '    Flask HTTP Authentication Server   ' -ForegroundColor White;
-Write-Host '========================================' -ForegroundColor Blue;
-Write-Host '';
-Write-Host 'Listening on: http://0.0.0.0:80/' -ForegroundColor Green;
-Write-Host 'iPhone auth endpoint: http://127.10.10.10/I' -ForegroundColor Cyan;
-Write-Host '';
-Write-Host 'This handles iOS app authentication' -ForegroundColor Gray;
-Write-Host 'before RTMP streaming can begin.' -ForegroundColor Gray;
-Write-Host '';
-Write-Host '========================================' -ForegroundColor Blue;
-Write-Host '';
 Set-Location "$script:SRSHome";
-& python server.py --host 0.0.0.0 --port 80;
-Write-Host '';
-Write-Host 'Flask stopped. Press any key to close...' -ForegroundColor Yellow;
-`$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+& python server.py --host 0.0.0.0 --port 80
 "@
 
-    Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $flaskCommand -WindowStyle Normal
+    Start-Process powershell -ArgumentList "-ExecutionPolicy", "Bypass", "-Command", $flaskCommand -WindowStyle Hidden
 
     # Give Flask time to initialize Python environment
     Start-Sleep -Seconds 3
@@ -2084,21 +2068,11 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
 
     # CRITICAL: plink MUST use -batch AND have a running command or the tunnel won't bind ports!
     # Using 'cat' as keep-alive - it waits forever for input that never comes
+    # -batch auto-accepts host keys so it works with different phones without user interaction
     $tunnelCommand = @"
-`$Host.UI.RawUI.WindowTitle = 'SSH Tunnel - KEEP OPEN';
-Write-Host '========================================' -ForegroundColor Yellow;
-Write-Host '  SSH REVERSE TUNNEL - KEEP THIS OPEN  ' -ForegroundColor White;
-Write-Host '========================================' -ForegroundColor Yellow;
-Write-Host '';
-Write-Host 'Tunneling ports 80 + 1935 to iPhone' -ForegroundColor Cyan;
-Write-Host 'If you close this window, streaming stops!' -ForegroundColor Red;
-Write-Host '';
-& "$plinkPath" -ssh -batch -R 127.10.10.10:80:localhost:80 -R 127.10.10.10:1935:localhost:1935 -pw $sshPassword root@localhost -P 2222 'echo TUNNEL_ACTIVE; cat';
-Write-Host '';
-Write-Host 'SSH Tunnel disconnected. Press any key...' -ForegroundColor Yellow;
-`$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+& "$plinkPath" -ssh -batch -R 127.10.10.10:80:localhost:80 -R 127.10.10.10:1935:localhost:1935 -pw $sshPassword root@localhost -P 2222 'echo TUNNEL_ACTIVE; cat'
 "@
-    Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $tunnelCommand -WindowStyle Normal
+    Start-Process powershell -ArgumentList "-ExecutionPolicy", "Bypass", "-Command", $tunnelCommand -WindowStyle Hidden
 
     # Give SSH time to connect and set up tunnels
     Write-Host "  ⏳ Waiting for SSH connection..." -ForegroundColor Gray
@@ -2132,11 +2106,11 @@ Write-Host 'SSH Tunnel disconnected. Press any key...' -ForegroundColor Yellow;
         Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] FINAL: STARTED WITH WARNINGS - check log for details"
     }
     Write-Host ""
-    Write-Host "  🔌 Four windows launched:" -ForegroundColor White
-    Write-Host "     1. iProxy (Cyan)        - USB port forwarding" -ForegroundColor Cyan
-    Write-Host "     2. Flask (Blue)         - HTTP auth server (port 80)" -ForegroundColor Blue
-    Write-Host "     3. Monibuca (Magenta)   - RTMP streaming server (port 1935)" -ForegroundColor Magenta
-    Write-Host "     4. SSH Tunnels (Yellow) - Reverse tunnels to iPhone" -ForegroundColor Yellow
+    Write-Host "  🔌 Services running:" -ForegroundColor White
+    Write-Host "     ✅ iProxy      (background) - USB port forwarding" -ForegroundColor Gray
+    Write-Host "     ✅ Flask       (background) - HTTP auth on port 80" -ForegroundColor Gray
+    Write-Host "     ✅ SSH Tunnel  (background) - Reverse tunnels to iPhone" -ForegroundColor Gray
+    Write-Host "     📺 Monibuca   (visible)    - RTMP streaming on port 1935" -ForegroundColor Magenta
     Write-Host ""
     Write-Host "  🎬 OBS Stream Settings:" -ForegroundColor White
     Write-Host "     Server: rtmp://localhost:1935/live" -ForegroundColor Cyan
@@ -2144,15 +2118,12 @@ Write-Host 'SSH Tunnel disconnected. Press any key...' -ForegroundColor Yellow;
     Write-Host ""
     Write-Host "  📱 iPhone App (PULLS stream via tunnel):" -ForegroundColor White
     Write-Host "     Uses: rtmp://127.10.10.10:1935/live/srs" -ForegroundColor Green
-    Write-Host "     1. Install: ios/modified_debs/iosvcam_base_127_10_10_10.deb" -ForegroundColor Gray
-    Write-Host "     2. Connect via USB cable" -ForegroundColor Gray
-    Write-Host "     3. Open iOS-VCAM app and tap Connect" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "  ⚠️  FIRST TIME: Accept SSH host key in yellow window (type 'y')" -ForegroundColor Yellow
+    Write-Host "     Open iOS-VCAM app and tap Connect" -ForegroundColor Gray
     Write-Host ""
     Write-Host "  🌐 Monibuca Console: http://localhost:8081/" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "  📝 Log file: $script:UsbLogFile" -ForegroundColor Gray
+    Write-Host "  💡 Use Option [K] from menu to kill all & restart fresh" -ForegroundColor Yellow
+    Write-Host "  📝 Log: $script:UsbLogFile" -ForegroundColor Gray
     Write-Host ""
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
     Write-Host ""
