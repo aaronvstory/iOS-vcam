@@ -672,8 +672,19 @@ function Show-MainMenu {
     Write-Host "╚═══════════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Green
     Write-Host ""
 
+    # USB Streaming - Primary/Recommended option with special highlighting
+    Write-Host "    ╔═══════════════════════════════════════════════════════════════╗" -ForegroundColor Yellow
+    Write-Host "    ║  " -NoNewline -ForegroundColor Yellow
+    Write-Host "[U] 🔌 USB STREAMING (SSH Tunnel) - RECOMMENDED" -NoNewline -ForegroundColor Black -BackgroundColor Yellow
+    Write-Host "       ║" -ForegroundColor Yellow
+    Write-Host "    ╚═══════════════════════════════════════════════════════════════╝" -ForegroundColor Yellow
+    Write-Host "      • Most stable - direct USB connection, no WiFi needed" -ForegroundColor Gray
+    Write-Host "      • Low latency, reliable for production streaming" -ForegroundColor Gray
+    Write-Host "      • Requires: OpenSSH on iPhone + iproxy + plink" -ForegroundColor DarkGray
+    Write-Host ""
+
     if ($isMonibuca) {
-        Write-Host "  [A] 🚀 MONIBUCA STREAMING SERVER (Default)" -ForegroundColor Magenta
+        Write-Host "  [A] 🚀 MONIBUCA STREAMING SERVER (WiFi)" -ForegroundColor Magenta
         Write-Host "      • Modern, low-latency media server" -ForegroundColor Gray
         Write-Host "      • Optimized for iPhone WiFi streaming" -ForegroundColor Gray
         Write-Host "      • Uses config: $monibucaProfile" -ForegroundColor Gray
@@ -728,10 +739,6 @@ function Show-MainMenu {
     Write-Host "  [7] 📋 COPY RTMP URL TO CLIPBOARD" -ForegroundColor White
     Write-Host "  [8] 📱 CREATE iOS .DEB WITH CUSTOM IP" -ForegroundColor White
     Write-Host "  [9] 🧪 USB SETUP VALIDATION" -ForegroundColor White
-    Write-Host ""
-    Write-Host "  [U] 🔌 USB STREAMING (SSH Tunnel)" -ForegroundColor Magenta
-    Write-Host "      • Streams over USB without WiFi" -ForegroundColor Gray
-    Write-Host "      • Requires OpenSSH on iPhone" -ForegroundColor Gray
     Write-Host ""
     Write-Host "  [C] ⚙️  CONFIGURATION SETTINGS" -ForegroundColor White
     Write-Host "  [Q] 🚪 QUIT" -ForegroundColor White
@@ -3960,7 +3967,7 @@ try {
 
     do {
         Show-MainMenu
-        $choice = Read-Host "Choose option [A, B, 1, 3-9, U, C, Q]"
+        $choice = Read-Host "Choose option [U, A, B, 1, 3-9, C, Q]"
 
         if ([string]::IsNullOrEmpty($choice)) {
             $choice = "Q"
