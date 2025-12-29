@@ -701,6 +701,11 @@ function Show-MainMenu {
     }
     Write-Host ""
 
+    Write-Host "  [U] 🔌 USB STREAMING (SSH Tunnel)" -ForegroundColor Magenta
+    Write-Host "      • Streams over USB without WiFi" -ForegroundColor Gray
+    Write-Host "      • Requires OpenSSH on iPhone" -ForegroundColor Gray
+    Write-Host ""
+
     Write-Host "  [1] 🔐 FLASK AUTHENTICATION SERVER (Standalone)" -ForegroundColor White
     Write-Host "      • Handles iOS app authentication/validation" -ForegroundColor Gray
     Write-Host "      • Auto-installs Flask if needed" -ForegroundColor Gray
@@ -728,10 +733,6 @@ function Show-MainMenu {
     Write-Host "  [7] 📋 COPY RTMP URL TO CLIPBOARD" -ForegroundColor White
     Write-Host "  [8] 📱 CREATE iOS .DEB WITH CUSTOM IP" -ForegroundColor White
     Write-Host "  [9] 🧪 USB SETUP VALIDATION" -ForegroundColor White
-    Write-Host ""
-    Write-Host "  [U] 🔌 USB STREAMING (SSH Tunnel)" -ForegroundColor Magenta
-    Write-Host "      • Streams over USB without WiFi" -ForegroundColor Gray
-    Write-Host "      • Requires OpenSSH on iPhone" -ForegroundColor Gray
     Write-Host ""
     Write-Host "  [C] ⚙️  CONFIGURATION SETTINGS" -ForegroundColor White
     Write-Host "  [Q] 🚪 QUIT" -ForegroundColor White
@@ -3960,7 +3961,7 @@ try {
 
     do {
         Show-MainMenu
-        $choice = Read-Host "Choose option [A, B, 1, 3-9, U, C, Q]"
+        $choice = Read-Host "Choose option [A, B, U, 1, 3-9, C, Q]"
 
         if ([string]::IsNullOrEmpty($choice)) {
             $choice = "Q"
