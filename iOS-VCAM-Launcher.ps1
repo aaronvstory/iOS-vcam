@@ -1469,7 +1469,8 @@ function Start-MonibucaViaSshUsb {
     try {
         $conn2222 = Get-NetTCPConnection -LocalPort 2222 -ErrorAction Stop
         foreach ($c in $conn2222) {
-            $pname = (Get-Process -Id $c.OwningProcess -ErrorAction SilentlyContinue)?.ProcessName ?? "(unknown)"
+            $proc = Get-Process -Id $c.OwningProcess -ErrorAction SilentlyContinue
+            $pname = if ($proc) { $proc.ProcessName } else { "(unknown)" }
             Write-Host "  🔥 Stopping '$pname' on port 2222 (PID: $($c.OwningProcess))" -ForegroundColor Red
             try {
                 Stop-Process -Id $c.OwningProcess -Force -ErrorAction Stop
@@ -1559,7 +1560,7 @@ Write-Host 'iProxy stopped. Press any key to close...' -ForegroundColor Yellow;
     $iproxyCheck = $null
     do {
         Start-Sleep -Milliseconds 500
-        $iproxyCheck = Get-NetTCPConnection -LocalPort 2222 -ErrorAction SilentlyContinue
+        $iproxyCheck = Get-NetTCPConnection -LocalPort 2222 -ErrorAction SilentlyContinue | Where-Object { $_.State -eq 'Listen' }
     } while (-not $iproxyCheck -and ((Get-Date) - $startTime).TotalSeconds -lt $timeout)
 
     if ($iproxyCheck) {
@@ -1592,12 +1593,15 @@ Write-Host 'SSH tunnel closed. Press any key to close...' -ForegroundColor Yello
 `$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
 "@
 
+    # Count existing plink processes before launching
+    $plinkCountBefore = @(Get-Process -Name "plink" -ErrorAction SilentlyContinue).Count
+
     Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $sshCommand -WindowStyle Normal
 
-    # Verify SSH tunnel process started
+    # Verify SSH tunnel process started (check for new plink process)
     Start-Sleep -Seconds 3
-    $plinkRunning = Get-Process -Name "plink" -ErrorAction SilentlyContinue
-    if ($plinkRunning) {
+    $plinkCountAfter = @(Get-Process -Name "plink" -ErrorAction SilentlyContinue).Count
+    if ($plinkCountAfter -gt $plinkCountBefore) {
         Write-Host "  ✅ SSH tunnel process started" -ForegroundColor Green
         Write-Host "     Check yellow window for connection status" -ForegroundColor Gray
     } else {
@@ -1643,7 +1647,7 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
     $monibucaCheck = $null
     do {
         Start-Sleep -Milliseconds 500
-        $monibucaCheck = Get-NetTCPConnection -LocalPort 1935 -ErrorAction SilentlyContinue
+        $monibucaCheck = Get-NetTCPConnection -LocalPort 1935 -ErrorAction SilentlyContinue | Where-Object { $_.State -eq 'Listen' }
     } while (-not $monibucaCheck -and ((Get-Date) - $startTime).TotalSeconds -lt $timeout)
 
     if ($monibucaCheck) {
