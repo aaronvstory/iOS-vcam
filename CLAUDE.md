@@ -154,6 +154,48 @@ Debranding patterns:
 3. **Network detection fails**: Manually select adapter in launcher menu
 4. **Execution policy**: Always use `-ExecutionPolicy Bypass`
 
+## PowerShell Here-String Pitfalls (CRITICAL)
+
+When using here-strings (`@"..."@`) to build commands for `Start-Process`, variables inside single quotes will NOT expand:
+
+```powershell
+# ❌ BROKEN - Single quotes prevent expansion
+$psCommand = @"
+Set-Location '$script:SRSHome';        # Becomes literal '$script:SRSHome'
+& '$monibucaPath' -c '$configPath';    # Process won't find executable
+"@
+
+# ✅ CORRECT - Double quotes allow expansion
+$psCommand = @"
+Set-Location "$script:SRSHome";        # Expands to actual path
+& "$monibucaPath" -c "$configPath";    # Works correctly
+"@
+```
+
+**Rule:** In double-quoted here-strings:
+- `$variable` → expands ✅
+- `"$variable"` → expands ✅
+- `'$variable'` → does NOT expand ❌
+
+**Exception:** Keep single quotes for literal SSH remote commands:
+```powershell
+# The remote command should NOT be expanded by PowerShell
+& "$plinkPath" -ssh root@host 'echo TUNNEL_ACTIVE; cat'
+#                              └── Stays literal for iPhone shell
+```
+
+## SSH Tunnel Keep-Alive (CRITICAL)
+
+plink reverse tunnels require a running command or they die immediately:
+
+```powershell
+# ❌ BROKEN - Tunnel connects but closes immediately, ports don't bind
+plink.exe -ssh -R 127.0.0.1:80:localhost:80 root@host
+
+# ✅ CORRECT - 'cat' keeps session alive forever
+plink.exe -ssh -batch -R 127.0.0.1:80:localhost:80 root@host 'echo CONNECTED; cat'
+```
+
 ## Debug Mode
 
 Enable verbose SRS logging:
