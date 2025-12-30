@@ -36,6 +36,12 @@ Welcome to the **iOS-VCAM-Server** documentation. This wiki provides comprehensi
 *   **Quick Fix Commands** (One-liner fixes via plink)
 *   **Persistence** (Making settings survive reboots)
 
+### [🔍 USB Streaming Debugging](USB-Streaming-Debugging.md)
+*   **Quick Diagnostic Commands** (7 essential checks)
+*   **Common Error Messages** (With exact solutions)
+*   **Debugging Flowchart** (Visual troubleshooting guide)
+*   **Lessons Learned** (Avoid repeating mistakes)
+
 ### [🧠 Advanced Features](Advanced-Features.md)
 *   **SSH & .deb Installation** (Automated package management)
 *   **Debranding** (Customizing the iOS package)
