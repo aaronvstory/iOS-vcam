@@ -1749,8 +1749,8 @@ function Start-MonibucaViaSshUsb {
 
     # Device name mappings (UDID -> friendly name)
     $deviceNames = @{
-        "00008030-001229C01146402E" = "iPhone 8"
-        "308e6361884208deb815e12efc230a028ddc4b1a" = "iPhone SE2"
+        "00008030-001229C01146402E" = "iPhone SE2"
+        "308e6361884208deb815e12efc230a028ddc4b1a" = "iPhone 8"
     }
 
     if ($udidLines.Count -gt 1) {
