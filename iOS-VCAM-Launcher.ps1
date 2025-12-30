@@ -2073,20 +2073,62 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
         Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] iPhone alias warning: $aliasResult"
     }
 
-    # Start SSH tunnel with -batch mode and a keep-alive command (tunnel dies without a command!)
+    # STEP 9: Start SSH reverse tunnel reliably (no interactive host-key prompts)
+    # Uses -hostkey fingerprint pinning to bypass all prompts when switching phones
+    Write-Host "  🔑 Validating iPhone SSH host key..." -ForegroundColor Gray
+
+    # Optional: clear stale PuTTY cached keys for this endpoint (keeps registry tidy)
+    $hostKeyPath = 'HKCU:\Software\SimonTatham\PuTTY\SshHostKeys'
+    $hosts = @('localhost', '127.0.0.1')
+    $algs = @('ssh-ed25519', 'ssh-rsa', 'ecdsa-sha2-nistp256')
+    foreach ($h in $hosts) {
+        foreach ($a in $algs) {
+            Remove-ItemProperty -Path $hostKeyPath -Name "$a@2222:$h" -ErrorAction SilentlyContinue
+        }
+    }
+
+    # 9a) Probe once in -batch mode to extract the server fingerprint (will fail if not cached)
+    $probeOut = (& "$plinkPath" -ssh -batch -T -no-antispoof -P 2222 -pw "$sshPassword" root@localhost exit 2>&1) | Out-String
+    $probeCode = $LASTEXITCODE
+
+    # If probe failed due to host key not cached / mismatch, it prints SHA256 fingerprint. Parse it.
+    $hostKeyFp = $null
+    if ($probeCode -ne 0 -and $probeOut -match 'SHA256:[A-Za-z0-9+/=]+') {
+        $hostKeyFp = $Matches[0]
+        Write-Host "  ✅ Found host key fingerprint: $hostKeyFp" -ForegroundColor Green
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: HostKey=$hostKeyFp"
+    } elseif ($probeCode -eq 0) {
+        Write-Host "  ✅ Host key already cached" -ForegroundColor Green
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: Host key already cached"
+    } elseif ($probeOut -match 'Access denied|password') {
+        Write-Host "  ❌ SSH authentication failed (check password)" -ForegroundColor Red
+        Write-Host "     Check SSH password in Configuration Settings" -ForegroundColor Gray
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: AuthFail: $probeOut"
+        $allReady = $false
+    } else {
+        Write-Host "  ⚠️ Could not determine host key fingerprint; output logged" -ForegroundColor Yellow
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: ProbeOut: $probeOut"
+    }
+
+    # 9b) Start tunnel. If we discovered a fingerprint, pin it with -hostkey to avoid prompts.
     Write-Host "  🔗 Starting SSH reverse tunnel..." -ForegroundColor Gray
 
-    # CRITICAL: plink MUST use -batch AND have a running command or the tunnel won't bind ports!
-    # Using 'cat' as keep-alive - it waits forever for input that never comes
-    # -batch auto-accepts host keys so it works with different phones without user interaction
-    $tunnelCommand = @"
-& "$plinkPath" -ssh -batch -R 127.10.10.10:80:localhost:80 -R 127.10.10.10:1935:localhost:1935 -pw $sshPassword root@localhost -P 2222 'echo TUNNEL_ACTIVE; cat'
-"@
-    Start-Process powershell -ArgumentList "-ExecutionPolicy", "Bypass", "-Command", $tunnelCommand -WindowStyle Hidden
+    $argList = @(
+        '-ssh', '-batch', '-T', '-no-antispoof', '-N',
+        '-R', '127.10.10.10:80:localhost:80',
+        '-R', '127.10.10.10:1935:localhost:1935',
+        '-P', '2222', '-pw', "$sshPassword", 'root@localhost'
+    )
+
+    if ($hostKeyFp) {
+        $argList = @('-hostkey', $hostKeyFp) + $argList
+    }
+
+    Start-Process -WindowStyle Hidden -FilePath "$plinkPath" -ArgumentList $argList
 
     # Give SSH time to connect and set up tunnels
-    Write-Host "  ⏳ Waiting for SSH connection..." -ForegroundColor Gray
-    Start-Sleep -Seconds 5
+    Write-Host "  ⏳ Establishing SSH tunnel..." -ForegroundColor Gray
+    Start-Sleep -Seconds 3
 
     # Verify plink process started AND stays alive
     $plinkProcs = Get-Process -Name "plink" -ErrorAction SilentlyContinue
