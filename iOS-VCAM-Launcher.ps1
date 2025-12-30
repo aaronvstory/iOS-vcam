@@ -2057,9 +2057,10 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
     Write-Host ""
 
     # Helper function: Probe for SSH fingerprint
+    # Uses -4 to force IPv4 (avoids ::1 connection refused noise)
     function Get-SshFingerprint {
         param([string]$PlinkExe, [string]$Password)
-        $out = (& $PlinkExe -ssh -batch -T -no-antispoof -P 2222 -pw $Password root@localhost exit 2>&1) | Out-String
+        $out = (& $PlinkExe -4 -ssh -batch -T -no-antispoof -P 2222 -pw $Password root@127.0.0.1 exit 2>&1) | Out-String
         if ($out -match 'SHA256:[A-Za-z0-9+/=]+') {
             return $Matches[0]
         }
@@ -2067,6 +2068,7 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
     }
 
     # Helper function: Run plink with fingerprint, retry once if host key changed
+    # Uses -4 and 127.0.0.1 to avoid IPv6 issues
     function Invoke-PlinkWithRetry {
         param(
             [string]$PlinkExe,
@@ -2074,17 +2076,17 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
             [string]$Fingerprint,
             [string]$Command
         )
-        $args = @('-ssh', '-batch', '-T', '-no-antispoof', '-P', '2222', '-pw', $Password, 'root@localhost', $Command)
-        if ($Fingerprint) { $args = @('-hostkey', $Fingerprint) + $args }
+        $plinkArgs = @('-4', '-ssh', '-batch', '-T', '-no-antispoof', '-P', '2222', '-pw', $Password, 'root@127.0.0.1', $Command)
+        if ($Fingerprint) { $plinkArgs = @('-hostkey', $Fingerprint) + $plinkArgs }
 
-        $result = (& $PlinkExe $args 2>&1) | Out-String
+        $result = (& $PlinkExe $plinkArgs 2>&1) | Out-String
 
         # If host key mismatch, re-probe and retry once
         if ($result -match 'Host key not in manually configured list') {
             $newFp = Get-SshFingerprint -PlinkExe $PlinkExe -Password $Password
             if ($newFp) {
-                $args = @('-hostkey', $newFp, '-ssh', '-batch', '-T', '-no-antispoof', '-P', '2222', '-pw', $Password, 'root@localhost', $Command)
-                $result = (& $PlinkExe $args 2>&1) | Out-String
+                $plinkArgs = @('-hostkey', $newFp, '-4', '-ssh', '-batch', '-T', '-no-antispoof', '-P', '2222', '-pw', $Password, 'root@127.0.0.1', $Command)
+                $result = (& $PlinkExe $plinkArgs 2>&1) | Out-String
                 return @{ Output = $result; Fingerprint = $newFp }
             }
         }
@@ -2155,11 +2157,12 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
     }
 
     # STEP 9c: Configure iPhone IP alias using the fingerprint
+    # Uses -4 and 127.0.0.1 to force IPv4
     Write-Host "  🔧 Setting up iPhone IP alias (127.10.10.10)..." -ForegroundColor Gray
     $aliasCmd = 'ifconfig lo0 alias 127.10.10.10 netmask 255.255.255.255; echo ALIAS_OK'
 
     # Build alias command args with hostkey if we have it
-    $aliasArgs = @('-ssh', '-batch', '-T', '-no-antispoof', '-P', '2222', '-pw', "$sshPassword", 'root@localhost', $aliasCmd)
+    $aliasArgs = @('-4', '-ssh', '-batch', '-T', '-no-antispoof', '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1', $aliasCmd)
     if ($hostKeyFp) {
         $aliasArgs = @('-hostkey', $hostKeyFp) + $aliasArgs
     }
@@ -2175,24 +2178,26 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
     }
 
     # STEP 9d: Verify tunnel will work BEFORE starting (verbose probe)
+    # Uses -4 and 127.0.0.1 to avoid IPv6 "Connection refused" false positives
     Write-Host "  🔍 Verifying tunnel acceptance..." -ForegroundColor Gray
 
-    $verifyArgs = @('-v', '-ssh', '-batch', '-T', '-no-antispoof',
+    $verifyArgs = @('-4', '-v', '-ssh', '-batch', '-T', '-no-antispoof',
         '-R', '127.10.10.10:80:127.0.0.1:80',
         '-R', '127.10.10.10:1935:127.0.0.1:1935',
-        '-P', '2222', '-pw', "$sshPassword", 'root@localhost', 'echo PROBE; exit')
+        '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1', 'echo PROBE; exit')
     if ($hostKeyFp) { $verifyArgs = @('-hostkey', $hostKeyFp) + $verifyArgs }
 
     $verifyOut = (& "$plinkPath" $verifyArgs 2>&1) | Out-String
 
-    # Check for "refused" - means sshd config is wrong
-    if ($verifyOut -match 'refused|prohibited') {
+    # Check for REMOTE PORT FORWARDING refused (not generic "Connection refused")
+    # The tight match avoids false positives from IPv6 connection attempts
+    if ($verifyOut -match 'Remote port forwarding from .* (refused|prohibited)|administratively prohibited|cannot listen') {
         Write-Host "  ❌ Tunnel REFUSED by iPhone sshd!" -ForegroundColor Red
         Write-Host "     GatewayPorts/AllowTcpForwarding not configured properly" -ForegroundColor Yellow
         Write-Host "     See: docs/Post-Reboot-Checklist.md" -ForegroundColor Gray
         Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: Tunnel REFUSED - sshd config issue"
         $allReady = $false
-    } elseif ($verifyOut -match 'Remote port forwarding.*enabled') {
+    } elseif ($verifyOut -match 'Remote port forwarding from .* enabled') {
         Write-Host "  ✅ Tunnel ports accepted by sshd" -ForegroundColor Green
         Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: Tunnel ports accepted"
     } elseif ($verifyOut -match 'Host key not in manually configured list') {
@@ -2200,13 +2205,13 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
         Write-Host "  🔑 Host key changed, re-probing..." -ForegroundColor Cyan
         $hostKeyFp = Get-SshFingerprint -PlinkExe $plinkPath -Password $sshPassword
         if ($hostKeyFp) {
-            $verifyArgs = @('-hostkey', $hostKeyFp, '-v', '-ssh', '-batch', '-T', '-no-antispoof',
+            $verifyArgs = @('-hostkey', $hostKeyFp, '-4', '-v', '-ssh', '-batch', '-T', '-no-antispoof',
                 '-R', '127.10.10.10:80:127.0.0.1:80', '-R', '127.10.10.10:1935:127.0.0.1:1935',
-                '-P', '2222', '-pw', "$sshPassword", 'root@localhost', 'echo PROBE; exit')
+                '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1', 'echo PROBE; exit')
             $verifyOut = (& "$plinkPath" $verifyArgs 2>&1) | Out-String
-            if ($verifyOut -match 'Remote port forwarding.*enabled') {
+            if ($verifyOut -match 'Remote port forwarding from .* enabled') {
                 Write-Host "  ✅ Tunnel ports accepted (after key refresh)" -ForegroundColor Green
-            } elseif ($verifyOut -match 'refused') {
+            } elseif ($verifyOut -match 'Remote port forwarding from .* refused') {
                 Write-Host "  ❌ Tunnel still REFUSED after key refresh" -ForegroundColor Red
                 $allReady = $false
             }
@@ -2214,14 +2219,15 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
     }
 
     # STEP 9e: Start the actual tunnel (keep-alive with 'cat')
+    # Uses -4 and 127.0.0.1 to force IPv4
     if ($allReady) {
         Write-Host "  🔗 Starting SSH reverse tunnel..." -ForegroundColor Gray
 
         $tunnelArgs = @(
-            '-ssh', '-batch', '-T', '-no-antispoof',
+            '-4', '-ssh', '-batch', '-T', '-no-antispoof',
             '-R', '127.10.10.10:80:127.0.0.1:80',
             '-R', '127.10.10.10:1935:127.0.0.1:1935',
-            '-P', '2222', '-pw', "$sshPassword", 'root@localhost', 'cat'
+            '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1', 'cat'
         )
         if ($hostKeyFp) { $tunnelArgs = @('-hostkey', $hostKeyFp) + $tunnelArgs }
 
