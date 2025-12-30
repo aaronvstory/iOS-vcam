@@ -2055,25 +2055,8 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
     # ============================================================================
     Write-Host "[STEP 9/9] 🔗 Starting SSH tunnels (ports 80 + 1935)..." -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "  This step creates reverse tunnels AND sets up iPhone IP alias." -ForegroundColor Gray
-    Write-Host "  ⚠️  FIRST TIME: Type 'y' to accept SSH host key when prompted!" -ForegroundColor Yellow
-    Write-Host ""
 
-    # Configure iPhone IP alias (GatewayPorts should already be enabled - see USB-STREAMING-WORKING.md)
-    Write-Host "  🔧 Setting up iPhone IP alias..." -ForegroundColor Gray
-    # Simple command without nested quotes to avoid escaping issues through plink→zsh
-    $aliasCmd = 'ifconfig lo0 alias 127.10.10.10 netmask 255.255.255.255; echo ALIAS_OK'
-    $aliasResult = & $plinkPath -ssh -batch -pw $sshPassword root@localhost -P 2222 $aliasCmd 2>&1
-    if ($aliasResult -match 'ALIAS_OK') {
-        Write-Host "  ✅ iPhone IP alias configured (127.10.10.10)" -ForegroundColor Green
-        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] iPhone alias OK"
-    } else {
-        Write-Host "  ⚠️ iPhone alias may have issues (continuing anyway)" -ForegroundColor Yellow
-        Write-Host "     Run manually on iPhone: ifconfig lo0 alias 127.10.10.10" -ForegroundColor Gray
-        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] iPhone alias warning: $aliasResult"
-    }
-
-    # STEP 9: Start SSH reverse tunnel reliably (no interactive host-key prompts)
+    # STEP 9a: Get SSH host key fingerprint FIRST (needed for all subsequent SSH commands)
     # Uses -hostkey fingerprint pinning to bypass all prompts when switching phones
     Write-Host "  🔑 Validating iPhone SSH host key..." -ForegroundColor Gray
 
@@ -2087,7 +2070,7 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
         }
     }
 
-    # 9a) Probe once in -batch mode to extract the server fingerprint (will fail if not cached)
+    # Probe once in -batch mode to extract the server fingerprint (will fail if not cached)
     $probeOut = (& "$plinkPath" -ssh -batch -T -no-antispoof -P 2222 -pw "$sshPassword" root@localhost exit 2>&1) | Out-String
     $probeCode = $LASTEXITCODE
 
@@ -2110,7 +2093,27 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
         Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: ProbeOut: $probeOut"
     }
 
-    # 9b) Start tunnel. If we discovered a fingerprint, pin it with -hostkey to avoid prompts.
+    # STEP 9b: Configure iPhone IP alias using the fingerprint
+    Write-Host "  🔧 Setting up iPhone IP alias (127.10.10.10)..." -ForegroundColor Gray
+    $aliasCmd = 'ifconfig lo0 alias 127.10.10.10 netmask 255.255.255.255; echo ALIAS_OK'
+
+    # Build alias command args with hostkey if we have it
+    $aliasArgs = @('-ssh', '-batch', '-T', '-no-antispoof', '-P', '2222', '-pw', "$sshPassword", 'root@localhost', $aliasCmd)
+    if ($hostKeyFp) {
+        $aliasArgs = @('-hostkey', $hostKeyFp) + $aliasArgs
+    }
+
+    $aliasResult = (& "$plinkPath" $aliasArgs 2>&1) | Out-String
+    if ($aliasResult -match 'ALIAS_OK') {
+        Write-Host "  ✅ iPhone IP alias configured" -ForegroundColor Green
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] iPhone alias OK"
+    } else {
+        Write-Host "  ⚠️ iPhone alias may have issues (continuing anyway)" -ForegroundColor Yellow
+        Write-Host "     Run manually on iPhone: ifconfig lo0 alias 127.10.10.10" -ForegroundColor Gray
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] iPhone alias warning: $aliasResult"
+    }
+
+    # STEP 9c: Start the reverse tunnel with the fingerprint
     Write-Host "  🔗 Starting SSH reverse tunnel..." -ForegroundColor Gray
 
     $argList = @(
