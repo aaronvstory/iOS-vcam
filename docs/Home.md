@@ -31,6 +31,11 @@ Welcome to the **iOS-VCAM-Server** documentation. This wiki provides comprehensi
 *   **Diagnostics** (Using the launcher diagnostics)
 *   **Crash Fixes** (Known solutions)
 
+### [🔄 Post-Reboot Checklist](Post-Reboot-Checklist.md)
+*   **What Gets Lost** (sshd config, host keys, aliases)
+*   **Quick Fix Commands** (One-liner fixes via plink)
+*   **Persistence** (Making settings survive reboots)
+
 ### [🧠 Advanced Features](Advanced-Features.md)
 *   **SSH & .deb Installation** (Automated package management)
 *   **Debranding** (Customizing the iOS package)

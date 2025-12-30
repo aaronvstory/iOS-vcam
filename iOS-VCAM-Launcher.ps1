@@ -2056,44 +2056,105 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
     Write-Host "[STEP 9/9] 🔗 Starting SSH tunnels (ports 80 + 1935)..." -ForegroundColor Yellow
     Write-Host ""
 
-    # STEP 9a: Get SSH host key fingerprint FIRST (needed for all subsequent SSH commands)
-    # Uses -hostkey fingerprint pinning to bypass all prompts when switching phones
-    Write-Host "  🔑 Validating iPhone SSH host key..." -ForegroundColor Gray
+    # Helper function: Probe for SSH fingerprint
+    function Get-SshFingerprint {
+        param([string]$PlinkExe, [string]$Password)
+        $out = (& $PlinkExe -ssh -batch -T -no-antispoof -P 2222 -pw $Password root@localhost exit 2>&1) | Out-String
+        if ($out -match 'SHA256:[A-Za-z0-9+/=]+') {
+            return $Matches[0]
+        }
+        return $null
+    }
 
-    # Optional: clear stale PuTTY cached keys for this endpoint (keeps registry tidy)
+    # Helper function: Run plink with fingerprint, retry once if host key changed
+    function Invoke-PlinkWithRetry {
+        param(
+            [string]$PlinkExe,
+            [string]$Password,
+            [string]$Fingerprint,
+            [string]$Command
+        )
+        $args = @('-ssh', '-batch', '-T', '-no-antispoof', '-P', '2222', '-pw', $Password, 'root@localhost', $Command)
+        if ($Fingerprint) { $args = @('-hostkey', $Fingerprint) + $args }
+
+        $result = (& $PlinkExe $args 2>&1) | Out-String
+
+        # If host key mismatch, re-probe and retry once
+        if ($result -match 'Host key not in manually configured list') {
+            $newFp = Get-SshFingerprint -PlinkExe $PlinkExe -Password $Password
+            if ($newFp) {
+                $args = @('-hostkey', $newFp, '-ssh', '-batch', '-T', '-no-antispoof', '-P', '2222', '-pw', $Password, 'root@localhost', $Command)
+                $result = (& $PlinkExe $args 2>&1) | Out-String
+                return @{ Output = $result; Fingerprint = $newFp }
+            }
+        }
+        return @{ Output = $result; Fingerprint = $Fingerprint }
+    }
+
+    # STEP 9a: Get SSH host key fingerprint
+    Write-Host "  🔑 Probing iPhone SSH host key..." -ForegroundColor Gray
+
+    # Clear stale PuTTY cached keys
     $hostKeyPath = 'HKCU:\Software\SimonTatham\PuTTY\SshHostKeys'
-    $hosts = @('localhost', '127.0.0.1')
-    $algs = @('ssh-ed25519', 'ssh-rsa', 'ecdsa-sha2-nistp256')
-    foreach ($h in $hosts) {
-        foreach ($a in $algs) {
-            Remove-ItemProperty -Path $hostKeyPath -Name "$a@2222:$h" -ErrorAction SilentlyContinue
+    @('localhost', '127.0.0.1') | ForEach-Object { $h = $_
+        @('ssh-ed25519', 'ssh-rsa', 'ecdsa-sha2-nistp256') | ForEach-Object {
+            Remove-ItemProperty -Path $hostKeyPath -Name "$_@2222:$h" -ErrorAction SilentlyContinue
         }
     }
 
-    # Probe once in -batch mode to extract the server fingerprint (will fail if not cached)
-    $probeOut = (& "$plinkPath" -ssh -batch -T -no-antispoof -P 2222 -pw "$sshPassword" root@localhost exit 2>&1) | Out-String
-    $probeCode = $LASTEXITCODE
-
-    # If probe failed due to host key not cached / mismatch, it prints SHA256 fingerprint. Parse it.
-    $hostKeyFp = $null
-    if ($probeCode -ne 0 -and $probeOut -match 'SHA256:[A-Za-z0-9+/=]+') {
-        $hostKeyFp = $Matches[0]
-        Write-Host "  ✅ Found host key fingerprint: $hostKeyFp" -ForegroundColor Green
+    $hostKeyFp = Get-SshFingerprint -PlinkExe $plinkPath -Password $sshPassword
+    if ($hostKeyFp) {
+        Write-Host "  ✅ Host key fingerprint: $hostKeyFp" -ForegroundColor Green
         Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: HostKey=$hostKeyFp"
-    } elseif ($probeCode -eq 0) {
-        Write-Host "  ✅ Host key already cached" -ForegroundColor Green
-        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: Host key already cached"
-    } elseif ($probeOut -match 'Access denied|password') {
-        Write-Host "  ❌ SSH authentication failed (check password)" -ForegroundColor Red
-        Write-Host "     Check SSH password in Configuration Settings" -ForegroundColor Gray
-        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: AuthFail: $probeOut"
-        $allReady = $false
     } else {
-        Write-Host "  ⚠️ Could not determine host key fingerprint; output logged" -ForegroundColor Yellow
-        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: ProbeOut: $probeOut"
+        Write-Host "  ⚠️ Could not determine host key fingerprint" -ForegroundColor Yellow
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: No fingerprint found"
     }
 
-    # STEP 9b: Configure iPhone IP alias using the fingerprint
+    # STEP 9b: Verify/Fix sshd GatewayPorts configuration (critical after reboot!)
+    Write-Host "  🔧 Checking iPhone sshd configuration..." -ForegroundColor Gray
+
+    $sshdCheckCmd = 'sshd -T 2>/dev/null | grep -E "^gatewayports|^allowtcpforwarding"'
+    $sshdResult = Invoke-PlinkWithRetry -PlinkExe $plinkPath -Password $sshPassword -Fingerprint $hostKeyFp -Command $sshdCheckCmd
+    $hostKeyFp = $sshdResult.Fingerprint  # Update if it changed
+
+    $needsSshdFix = $false
+    if ($sshdResult.Output -notmatch 'gatewayports clientspecified') {
+        $needsSshdFix = $true
+        Write-Host "  ⚠️ GatewayPorts not configured - fixing..." -ForegroundColor Yellow
+    }
+    if ($sshdResult.Output -notmatch 'allowtcpforwarding yes') {
+        $needsSshdFix = $true
+        Write-Host "  ⚠️ AllowTcpForwarding not enabled - fixing..." -ForegroundColor Yellow
+    }
+
+    if ($needsSshdFix) {
+        # Apply sshd config fixes
+        $fixCmd = 'grep -q "^GatewayPorts clientspecified" /etc/ssh/sshd_config || echo "GatewayPorts clientspecified" >> /etc/ssh/sshd_config; grep -q "^AllowTcpForwarding yes" /etc/ssh/sshd_config || echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config; launchctl unload /Library/LaunchDaemons/com.openssh.sshd.plist 2>/dev/null; launchctl load /Library/LaunchDaemons/com.openssh.sshd.plist 2>/dev/null; echo SSHD_FIXED'
+        $fixResult = Invoke-PlinkWithRetry -PlinkExe $plinkPath -Password $sshPassword -Fingerprint $hostKeyFp -Command $fixCmd
+
+        if ($fixResult.Output -match 'SSHD_FIXED') {
+            Write-Host "  ✅ sshd configuration fixed and restarted" -ForegroundColor Green
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: sshd config fixed"
+
+            # CRITICAL: sshd restart may change host key - re-probe!
+            Start-Sleep -Seconds 1
+            $newFp = Get-SshFingerprint -PlinkExe $plinkPath -Password $sshPassword
+            if ($newFp -and $newFp -ne $hostKeyFp) {
+                Write-Host "  🔑 Host key changed after sshd restart: $newFp" -ForegroundColor Cyan
+                $hostKeyFp = $newFp
+                Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: NewHostKey=$hostKeyFp"
+            }
+        } else {
+            Write-Host "  ⚠️ Could not fix sshd config automatically" -ForegroundColor Yellow
+            Write-Host "     See: docs/Post-Reboot-Checklist.md for manual fix" -ForegroundColor Gray
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: sshd fix failed: $($fixResult.Output)"
+        }
+    } else {
+        Write-Host "  ✅ sshd configuration OK" -ForegroundColor Green
+    }
+
+    # STEP 9c: Configure iPhone IP alias using the fingerprint
     Write-Host "  🔧 Setting up iPhone IP alias (127.10.10.10)..." -ForegroundColor Gray
     $aliasCmd = 'ifconfig lo0 alias 127.10.10.10 netmask 255.255.255.255; echo ALIAS_OK'
 
@@ -2113,50 +2174,80 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
         Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] iPhone alias warning: $aliasResult"
     }
 
-    # STEP 9c: Start the reverse tunnel with the fingerprint
-    # CRITICAL: Use 'cat' as keep-alive command - plink's -N flag doesn't bind ports properly!
-    # Also use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues
-    Write-Host "  🔗 Starting SSH reverse tunnel..." -ForegroundColor Gray
+    # STEP 9d: Verify tunnel will work BEFORE starting (verbose probe)
+    Write-Host "  🔍 Verifying tunnel acceptance..." -ForegroundColor Gray
 
-    $tunnelArgs = @(
-        '-ssh', '-batch', '-T', '-no-antispoof',
+    $verifyArgs = @('-v', '-ssh', '-batch', '-T', '-no-antispoof',
         '-R', '127.10.10.10:80:127.0.0.1:80',
         '-R', '127.10.10.10:1935:127.0.0.1:1935',
-        '-P', '2222', '-pw', "$sshPassword", 'root@localhost', 'cat'
-    )
+        '-P', '2222', '-pw', "$sshPassword", 'root@localhost', 'echo PROBE; exit')
+    if ($hostKeyFp) { $verifyArgs = @('-hostkey', $hostKeyFp) + $verifyArgs }
 
-    if ($hostKeyFp) {
-        $tunnelArgs = @('-hostkey', $hostKeyFp) + $tunnelArgs
+    $verifyOut = (& "$plinkPath" $verifyArgs 2>&1) | Out-String
+
+    # Check for "refused" - means sshd config is wrong
+    if ($verifyOut -match 'refused|prohibited') {
+        Write-Host "  ❌ Tunnel REFUSED by iPhone sshd!" -ForegroundColor Red
+        Write-Host "     GatewayPorts/AllowTcpForwarding not configured properly" -ForegroundColor Yellow
+        Write-Host "     See: docs/Post-Reboot-Checklist.md" -ForegroundColor Gray
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: Tunnel REFUSED - sshd config issue"
+        $allReady = $false
+    } elseif ($verifyOut -match 'Remote port forwarding.*enabled') {
+        Write-Host "  ✅ Tunnel ports accepted by sshd" -ForegroundColor Green
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: Tunnel ports accepted"
+    } elseif ($verifyOut -match 'Host key not in manually configured list') {
+        # Host key changed again - re-probe and retry
+        Write-Host "  🔑 Host key changed, re-probing..." -ForegroundColor Cyan
+        $hostKeyFp = Get-SshFingerprint -PlinkExe $plinkPath -Password $sshPassword
+        if ($hostKeyFp) {
+            $verifyArgs = @('-hostkey', $hostKeyFp, '-v', '-ssh', '-batch', '-T', '-no-antispoof',
+                '-R', '127.10.10.10:80:127.0.0.1:80', '-R', '127.10.10.10:1935:127.0.0.1:1935',
+                '-P', '2222', '-pw', "$sshPassword", 'root@localhost', 'echo PROBE; exit')
+            $verifyOut = (& "$plinkPath" $verifyArgs 2>&1) | Out-String
+            if ($verifyOut -match 'Remote port forwarding.*enabled') {
+                Write-Host "  ✅ Tunnel ports accepted (after key refresh)" -ForegroundColor Green
+            } elseif ($verifyOut -match 'refused') {
+                Write-Host "  ❌ Tunnel still REFUSED after key refresh" -ForegroundColor Red
+                $allReady = $false
+            }
+        }
     }
 
-    Start-Process -WindowStyle Hidden -FilePath "$plinkPath" -ArgumentList $tunnelArgs
+    # STEP 9e: Start the actual tunnel (keep-alive with 'cat')
+    if ($allReady) {
+        Write-Host "  🔗 Starting SSH reverse tunnel..." -ForegroundColor Gray
 
-    # Give SSH time to connect and set up tunnels
-    Write-Host "  ⏳ Establishing SSH tunnel..." -ForegroundColor Gray
-    Start-Sleep -Seconds 3
+        $tunnelArgs = @(
+            '-ssh', '-batch', '-T', '-no-antispoof',
+            '-R', '127.10.10.10:80:127.0.0.1:80',
+            '-R', '127.10.10.10:1935:127.0.0.1:1935',
+            '-P', '2222', '-pw', "$sshPassword", 'root@localhost', 'cat'
+        )
+        if ($hostKeyFp) { $tunnelArgs = @('-hostkey', $hostKeyFp) + $tunnelArgs }
 
-    # Verify plink process started AND stays alive
-    $plinkProcs = Get-Process -Name "plink" -ErrorAction SilentlyContinue
-    if ($plinkProcs) {
-        Write-Host "  ✅ SSH tunnel process started (PID: $($plinkProcs.Id -join ', '))" -ForegroundColor Green
+        Start-Process -WindowStyle Hidden -FilePath "$plinkPath" -ArgumentList $tunnelArgs
 
-        # Brief liveness check - plink can die immediately if auth fails or host key issues
+        # Give SSH time to connect
         Start-Sleep -Seconds 2
-        $plinkStillAlive = Get-Process -Name "plink" -ErrorAction SilentlyContinue
-        if ($plinkStillAlive) {
-            Write-Host "  ✅ SSH tunnel confirmed stable" -ForegroundColor Green
-            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel OK - plink alive after liveness check"
+
+        # Verify plink process stays alive
+        $plinkProcs = Get-Process -Name "plink" -ErrorAction SilentlyContinue
+        if ($plinkProcs) {
+            Start-Sleep -Seconds 2
+            $plinkStillAlive = Get-Process -Name "plink" -ErrorAction SilentlyContinue
+            if ($plinkStillAlive) {
+                Write-Host "  ✅ SSH tunnel running (PID: $($plinkStillAlive.Id -join ', '))" -ForegroundColor Green
+                Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel OK - plink stable"
+            } else {
+                Write-Host "  ⚠️ SSH tunnel died shortly after starting!" -ForegroundColor Yellow
+                Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel DIED"
+                $allReady = $false
+            }
         } else {
-            Write-Host "  ⚠️ SSH tunnel died shortly after starting!" -ForegroundColor Yellow
-            Write-Host "     Check: iPhone connected? SSH password correct? Host key accepted?" -ForegroundColor Gray
-            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel DIED - plink exited after startup"
+            Write-Host "  ⚠️ SSH tunnel failed to start" -ForegroundColor Yellow
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel FAILED - no process"
             $allReady = $false
         }
-    } else {
-        Write-Host "  ⚠️ SSH tunnel failed to start" -ForegroundColor Yellow
-        Write-Host "     Check: plink.exe exists? iproxy running? iPhone connected?" -ForegroundColor Gray
-        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel FAILED - plink process NOT FOUND"
-        $allReady = $false
     }
     Write-Host ""
 

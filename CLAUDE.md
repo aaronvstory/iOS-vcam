@@ -119,6 +119,34 @@ Stream RTMP from iPhone to PC over USB cable using SSH reverse tunneling. Elimin
 - Pre-built .deb: `ios/modified_debs/iosvcam_base_127_10_10_10.deb`
 - Full docs: `tasks/USB-SSH-STREAMING-GUIDE.md`
 
+### CRITICAL: After iPhone Reboot / Re-Jailbreak
+
+USB streaming will fail after reboot until these are restored (see `docs/Post-Reboot-Checklist.md`):
+
+| What Gets Lost | Fix |
+|---------------|-----|
+| SSH host key changes | Launcher auto-probes fingerprint with `-hostkey` pinning |
+| sshd GatewayPorts | Launcher auto-fixes config and restarts sshd |
+| Loopback alias 127.10.10.10 | Launcher sets up alias automatically |
+
+**If tunnel shows "REFUSED"**: sshd config needs these lines:
+```
+AllowTcpForwarding yes
+GatewayPorts clientspecified
+```
+
+The launcher now handles this automatically, but manual fix if needed:
+```powershell
+# Get fingerprint
+$fp = (.\plink.exe -ssh -batch -P 2222 -pw icemat root@localhost exit 2>&1 | Select-String "SHA256:").Matches.Value
+
+# Fix sshd and restart
+.\plink.exe -hostkey $fp -ssh -P 2222 -pw icemat root@localhost 'echo "GatewayPorts clientspecified" >> /etc/ssh/sshd_config; launchctl unload /Library/LaunchDaemons/com.openssh.sshd.plist; launchctl load /Library/LaunchDaemons/com.openssh.sshd.plist'
+
+# Get NEW fingerprint (changes after restart!)
+$fp = (.\plink.exe -ssh -batch -P 2222 -pw icemat root@localhost exit 2>&1 | Select-String "SHA256:").Matches.Value
+```
+
 ### iOS .deb Package System
 
 The debranding workflow:
