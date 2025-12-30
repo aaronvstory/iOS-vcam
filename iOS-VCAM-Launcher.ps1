@@ -2114,20 +2114,22 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
     }
 
     # STEP 9c: Start the reverse tunnel with the fingerprint
+    # CRITICAL: Use 'cat' as keep-alive command - plink's -N flag doesn't bind ports properly!
+    # Also use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues
     Write-Host "  🔗 Starting SSH reverse tunnel..." -ForegroundColor Gray
 
-    $argList = @(
-        '-ssh', '-batch', '-T', '-no-antispoof', '-N',
-        '-R', '127.10.10.10:80:localhost:80',
-        '-R', '127.10.10.10:1935:localhost:1935',
-        '-P', '2222', '-pw', "$sshPassword", 'root@localhost'
+    $tunnelArgs = @(
+        '-ssh', '-batch', '-T', '-no-antispoof',
+        '-R', '127.10.10.10:80:127.0.0.1:80',
+        '-R', '127.10.10.10:1935:127.0.0.1:1935',
+        '-P', '2222', '-pw', "$sshPassword", 'root@localhost', 'cat'
     )
 
     if ($hostKeyFp) {
-        $argList = @('-hostkey', $hostKeyFp) + $argList
+        $tunnelArgs = @('-hostkey', $hostKeyFp) + $tunnelArgs
     }
 
-    Start-Process -WindowStyle Hidden -FilePath "$plinkPath" -ArgumentList $argList
+    Start-Process -WindowStyle Hidden -FilePath "$plinkPath" -ArgumentList $tunnelArgs
 
     # Give SSH time to connect and set up tunnels
     Write-Host "  ⏳ Establishing SSH tunnel..." -ForegroundColor Gray
