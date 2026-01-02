@@ -1,0 +1,102 @@
+Reading prompt from stdin...
+OpenAI Codex v0.77.0 (research preview)
+--------
+workdir: F:\claude\iOS-Vcam-server\iOS-VCAM-v4.2-Distribution
+model: gpt-5.2-codex
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: auto
+session id: 019b6a8a-678c-71b3-9e2e-f43baf1a8221
+--------
+user
+Review this PowerShell menu change. Check for: logic correctness, error handling, edge cases. Output JSON array with {severity, title, details, file, line, recommendation}, then brief summary.
+
+diff --git a/iOS-VCAM-Launcher.ps1 b/iOS-VCAM-Launcher.ps1
+index a8c3cc4..51b725c 100644
+--- a/iOS-VCAM-Launcher.ps1
++++ b/iOS-VCAM-Launcher.ps1
+@@ -670,12 +670,23 @@ function Show-MainMenu {
+     Write-Host "║" -ForegroundColor Green
+     Write-Host "    " -NoNewline
+     Write-Host "╚═══════════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Green
+     Write-Host ""
+ 
++    # USB Streaming - Primary/Recommended option with special highlighting
++    Write-Host "    ╔═══════════════════════════════════════════════════════════════╗" -ForegroundColor Yellow
++    Write-Host "    ║  " -NoNewline -ForegroundColor Yellow
++    Write-Host "[U] 🔌 USB STREAMING (SSH Tunnel) - RECOMMENDED" -NoNewline -ForegroundColor Black -BackgroundColor Yellow
++    Write-Host "       ║" -ForegroundColor Yellow
++    Write-Host "    ╚═══════════════════════════════════════════════════════════════╝" -ForegroundColor Yellow
++    Write-Host "      • Most stable - direct USB connection, no WiFi needed" -ForegroundColor Gray
++    Write-Host "      • Low latency, reliable for production streaming" -ForegroundColor Gray
++    Write-Host "      • Requires: OpenSSH on iPhone + iproxy + plink" -ForegroundColor DarkGray
++    Write-Host ""
++
+     if ($isMonibuca) {
+-        Write-Host "  [A] 🚀 MONIBUCA STREAMING SERVER (Default)" -ForegroundColor Magenta
++        Write-Host "  [A] 🚀 MONIBUCA STREAMING SERVER (WiFi)" -ForegroundColor Magenta
+         Write-Host "      • Modern, low-latency media server" -ForegroundColor Gray
+         Write-Host "      • Optimized for iPhone WiFi streaming" -ForegroundColor Gray
+         Write-Host "      • Uses config: $monibucaProfile" -ForegroundColor Gray
+     } else {
+         Write-Host "  [A] 🚀 SRS STREAMING SERVER (Active)" -ForegroundColor Cyan
+@@ -727,14 +738,10 @@ function Show-MainMenu {
+     Write-Host "  [6] 🔄 REFRESH NETWORK DETECTION" -ForegroundColor White
+     Write-Host "  [7] 📋 COPY RTMP URL TO CLIPBOARD" -ForegroundColor White
+     Write-Host "  [8] 📱 CREATE iOS .DEB WITH CUSTOM IP" -ForegroundColor White
+     Write-Host "  [9] 🧪 USB SETUP VALIDATION" -ForegroundColor White
+     Write-Host ""
+-    Write-Host "  [U] 🔌 USB STREAMING (SSH Tunnel)" -ForegroundColor Magenta
+-    Write-Host "      • Streams over USB without WiFi" -ForegroundColor Gray
+-    Write-Host "      • Requires OpenSSH on iPhone" -ForegroundColor Gray
+-    Write-Host ""
+     Write-Host "  [C] ⚙️  CONFIGURATION SETTINGS" -ForegroundColor White
+     Write-Host "  [Q] 🚪 QUIT" -ForegroundColor White
+     Write-Host ""
+     Write-Host "    " -NoNewline
+     Write-Host "╚═══════════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor DarkGray
+@@ -3958,11 +3965,11 @@ try {
+ 
+     Get-NetworkInfo
+ 
+     do {
+         Show-MainMenu
+-        $choice = Read-Host "Choose option [A, B, 1, 3-9, U, C, Q]"
++        $choice = Read-Host "Choose option [U, A, B, 1, 3-9, C, Q]"
+ 
+         if ([string]::IsNullOrEmpty($choice)) {
+             $choice = "Q"
+         }
+ 
+
+mcp: desktop-commander starting
+mcp: github starting
+mcp: exa starting
+mcp: sequential-thinking starting
+mcp: subagents starting
+mcp: chromedevtools starting
+mcp: serena starting
+mcp: exa ready
+mcp: github ready
+mcp: sequential-thinking ready
+mcp: subagents ready
+mcp: chromedevtools ready
+mcp: desktop-commander ready
+mcp: serena ready
+mcp startup: ready: exa, github, sequential-thinking, subagents, chromedevtools, desktop-commander, serena
+
+thinking
+**Summarizing review findings**
+
+I'll provide a JSON array with any detected issues but since I find no logic errors, error handling problems, or major edge cases—only minor UI alignment/style notes—I’ll return an empty array followed by a brief summary explaining that the changes are mostly cosmetic with no breaking concerns.
+codex
+[]
+
+Summary: No logic, error-handling, or edge-case issues found in this menu change; it is a cosmetic reordering/highlight with no behavioral impact.
+tokens used
+25,170
+[]
+
+Summary: No logic, error-handling, or edge-case issues found in this menu change; it is a cosmetic reordering/highlight with no behavioral impact.

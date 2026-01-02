@@ -117,7 +117,7 @@ Stream RTMP from iPhone to PC over USB cable using SSH reverse tunneling. Elimin
 
 **Files:**
 - Pre-built .deb: `ios/modified_debs/iosvcam_base_127_10_10_10.deb`
-- Full docs: `tasks/USB-SSH-STREAMING-GUIDE.md`
+- Full docs: `docs/Streaming-Guide.md`
 
 **Jetsam Protection (Auto-Applied):**
 The launcher automatically applies jetsam protection to TrollVNC and sshd daemons when starting USB streaming. This prevents iOS from killing these processes when 3rd party camera apps (Safari, etc.) request camera access.

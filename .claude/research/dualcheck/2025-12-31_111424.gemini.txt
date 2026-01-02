@@ -1,0 +1,73 @@
+YOLO mode is enabled. All tool calls will be automatically approved.
+Session cleanup disabled: Either maxAge or maxCount must be specified
+Loaded cached credentials.
+Loading extension: chime
+Loading extension: chrome-devtools-mcp
+Loading extension: code-review
+Loading extension: criticalthink
+Loading extension: extension-browser
+Loading extension: gemini-cli-prompt-library
+Loading extension: gemini-plan-commands
+Loading extension: genkit
+Loading extension: google-fonts
+Loading extension: nanobanana
+Server 'chime-notification-server' supports tool updates. Listening for changes...
+Server 'extension-browser-server' supports tool updates. Listening for changes...
+Server 'google-fonts-local-mcp' supports tool updates. Listening for changes...
+Server 'chrome-devtools' supports tool updates. Listening for changes...
+Server 'genkit' supports tool updates. Listening for changes...
+```json
+[
+  {
+    "severity": "CRITICAL",
+    "title": "Hardcoded SSH Credentials",
+    "details": "The password 'icemat' is hardcoded across multiple files (Post-Reboot-Checklist.md, USB-Streaming-Debugging.md, and iOS-VCAM-Launcher.ps1). This is a severe security vulnerability that exposes the iOS device to unauthorized access if the repository or workstation is compromised.",
+    "file": "multiple",
+    "line": "various",
+    "recommendation": "Use SSH Public Key authentication (authorized_keys) or prompt the user for credentials at runtime using Read-Host -AsSecureString."
+  },
+  {
+    "severity": "CRITICAL",
+    "title": "Broken Shutdown Logic (Hardcoded PID)",
+    "details": "The file 'shutdown.bat' attempts to kill a specific PID (117600). PIDs are dynamically assigned by the Operating System and change every time a process is launched. This script will fail or kill an unrelated process on subsequent runs.",
+    "file": "shutdown.bat",
+    "line": "1",
+    "recommendation": "Replace with name-based targeting: 'taskkill /f /im monibuca.exe' or use a PID file generated during startup."
+  },
+  {
+    "severity": "HIGH",
+    "title": "SSH Security Bypass (-no-antispoof)",
+    "details": "The use of the '-no-antispoof' flag in plink disables an important security check that prevents a server from hijacking the terminal session or providing misleading authentication prompts.",
+    "file": "iOS-VCAM-Launcher.ps1",
+    "line": "2184",
+    "recommendation": "Remove the '-no-antispoof' flag. If the goal is to suppress prompts, ensure the host key is correctly passed via the '-hostkey' parameter."
+  },
+  {
+    "severity": "MEDIUM",
+    "title": "Inconsistent and Deprecated PowerShell Cmdlets",
+    "details": "The launcher script uses 'Get-WmiObject' which is deprecated since PowerShell 3.0 and removed in PowerShell 7+. Meanwhile, the new diagnostic scripts in the documentation correctly use 'Get-CimInstance'.",
+    "file": "iOS-VCAM-Launcher.ps1",
+    "line": "1334",
+    "recommendation": "Update 'Get-WmiObject' to 'Get-CimInstance' throughout the launcher script for consistency and future-proofing."
+  },
+  {
+    "severity": "MEDIUM",
+    "title": "Brute Force Process Termination (killall -9)",
+    "details": "The 'Post-Reboot-Checklist.md' recommends 'killall -9 mediaserverd'. Using SIGKILL (-9) prevents the process from performing cleanup, which can lead to stale locks or hardware state issues in the iOS media subsystem.",
+    "file": "docs/Post-Reboot-Checklist.md",
+    "line": "32",
+    "recommendation": "Recommend 'killall mediaserverd' (SIGTERM) first, and only suggest -9 as a last resort if the process is completely unresponsive."
+  },
+  {
+    "severity": "LOW",
+    "title": "CLI Accessibility & Rendering",
+    "details": "The diagnostic script uses Unicode emojis (✅, ❌). While helpful for visual scanning, these may fail to render correctly in standard Windows Command Prompt or legacy PowerShell environments unless the font and encoding are explicitly set to UTF-8.",
+    "file": "docs/USB-Streaming-Debugging.md",
+    "line": "100",
+    "recommendation": "Add '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8' to the diagnostic script block to ensure consistent output."
+  }
+]
+```
+
+### Summary
+The changes introduce excellent **2025 best practices** for multi-device support, specifically the use of the `-u <UDID>` flag for `iproxy` and the port-based process targeting to prevent conflicts with VNC software. However, there are **critical security and logic issues**: hardcoding a PID in `shutdown.bat` makes the script unusable outside of a single specific run, and hardcoded credentials ('icemat') pose a major security risk. Additionally, security is unnecessarily weakened by the `-no-antispoof` flag. The project should transition to SSH keys and name-based process management to reach a production-ready state.

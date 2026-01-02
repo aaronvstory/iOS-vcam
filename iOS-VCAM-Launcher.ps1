@@ -791,7 +791,7 @@ function Start-CombinedFlaskAndSRS-SRS {
     }
 
     # Check Flask installation
-    Write-Host "[STEP 2/5`] 📦 Checking Flask installation..." -ForegroundColor Yellow
+    Write-Host "[STEP 2/5] 📦 Checking Flask installation..." -ForegroundColor Yellow
     $flaskInstalled = $false
     try {
         & python -c "import flask" 2>&1 | Out-Null
@@ -2207,9 +2207,10 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
 
     if ($vncJetsamCount -match '^0') {
         Write-Host "  🔧 Adding jetsam protection to TrollVNC..." -ForegroundColor Cyan
-        # Use perl to insert JetsamMemoryLimit and JetsamPriority before EnablePressuredExit or at end of dict
+        # Use perl to insert JetsamMemoryLimit and JetsamPriority before EnablePressuredExit if present,
+        # otherwise insert before closing </dict></plist> (fallback for plists without EnablePressuredExit)
         $vncFixCmd = @'
-perl -i -0777 -pe 's|(<key>EnablePressuredExit</key>)|<key>JetsamMemoryLimit</key>\n\t<integer>-1</integer>\n\t<key>JetsamPriority</key>\n\t<integer>18</integer>\n\t$1|s' /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null && launchctl unload /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null; launchctl load /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null && echo JETSAM_VNC_OK
+perl -i -0777 -pe 'if (!s|(<key>EnablePressuredExit</key>)|<key>JetsamMemoryLimit</key>\n\t<integer>-1</integer>\n\t<key>JetsamPriority</key>\n\t<integer>18</integer>\n\t$1|s) { s|(</dict>\s*</plist>)|<key>JetsamMemoryLimit</key>\n\t<integer>-1</integer>\n\t<key>JetsamPriority</key>\n\t<integer>18</integer>\n$1|s }' /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null && launchctl unload /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null; launchctl load /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null && echo JETSAM_VNC_OK
 '@
         $vncFixArgs = $plinkBaseArgs + @($vncFixCmd)
         $vncFixResult = (& "$plinkPath" $vncFixArgs 2>&1) | Out-String
@@ -2290,7 +2291,7 @@ perl -i -0777 -pe 's|(</dict>\s*</plist>)|<key>JetsamMemoryLimit</key>\n\t<integ
         }
     }
 
-    # STEP 9e: Start the actual tunnel (keep-alive with sleep)
+    # STEP 9f: Start the actual tunnel (keep-alive with sleep)
     # Uses -4 and 127.0.0.1 to force IPv4
     if ($allReady) {
         Write-Host "  🔗 Starting SSH reverse tunnel..." -ForegroundColor Gray

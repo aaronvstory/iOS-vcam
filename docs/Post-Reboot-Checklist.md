@@ -26,8 +26,12 @@ Write-Host "NEW Fingerprint: $fp"
 .\plink.exe -hostkey $fp -ssh -P 2222 -pw icemat root@localhost 'ifconfig lo0 alias 127.10.10.10 netmask 255.255.255.255; echo ALIAS_OK'
 
 # 6. Verify tunnel works
-.\plink.exe -v -hostkey $fp -ssh -batch -T -no-antispoof -R 127.10.10.10:80:127.0.0.1:80 -R 127.10.10.10:1935:127.0.0.1:1935 -P 2222 -pw icemat root@localhost 'echo TUNNEL_TEST; sleep 3' 2>&1 | Select-String "Remote port forwarding"
+.\plink.exe -v -hostkey $fp -ssh -batch -T -R 127.10.10.10:80:127.0.0.1:80 -R 127.10.10.10:1935:127.0.0.1:1935 -P 2222 -pw icemat root@localhost 'echo TUNNEL_TEST; sleep 3' 2>&1 | Select-String "Remote port forwarding"
 # Should show "enabled" NOT "refused"
+
+# 7. Stabilize Media Subsystem (Fixes Camera/VNC crashes)
+# Use SIGTERM first (graceful), then SIGKILL if needed
+.\plink.exe -hostkey $fp -ssh -P 2222 -pw icemat root@localhost 'killall mediaserverd; sleep 1; killall -9 mediaserverd 2>/dev/null; echo MEDIA_STABILIZED'
 ```
 
 ## What Gets Lost After Reboot

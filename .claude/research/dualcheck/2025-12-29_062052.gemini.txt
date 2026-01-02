@@ -1,0 +1,41 @@
+Session cleanup disabled: Either maxAge or maxCount must be specified
+Loaded cached credentials.
+Loading extension: chime
+Loading extension: chrome-devtools-mcp
+Loading extension: code-review
+Loading extension: criticalthink
+Loading extension: extension-browser
+Loading extension: gemini-cli-prompt-library
+Loading extension: gemini-plan-commands
+Loading extension: genkit
+Loading extension: google-fonts
+Loading extension: nanobanana
+Server 'chime-notification-server' supports tool updates. Listening for changes...
+Server 'extension-browser-server' supports tool updates. Listening for changes...
+Server 'google-fonts-local-mcp' supports tool updates. Listening for changes...
+Server 'chrome-devtools' supports tool updates. Listening for changes...
+Server 'genkit' supports tool updates. Listening for changes...
+```json
+[
+  {
+    "severity": "MEDIUM",
+    "title": "Inadequate Color Contrast for Menu Items",
+    "details": "The `Show-MainMenu` function uses hardcoded foreground colors like `Magenta`, `Gray`, and `DarkGray`. These colors, particularly `Gray` and `DarkGray` on a typical dark terminal background, may not meet WCAG contrast guidelines, making the text difficult to read for users with low vision or certain forms of color blindness. While `White` offers good contrast, the varied use without ensuring minimum contrast ratios can impact accessibility.",
+    "file": "iOS-VCAM-Launcher.ps1",
+    "line": 700,
+    "recommendation": "Avoid hardcoding colors where possible. If colors are used for emphasis, ensure they meet WCAG 2.1 AA contrast requirements against expected terminal background colors. Consider using only standard terminal foreground/background colors, or providing a mechanism for users to customize terminal colors if they have specific accessibility needs."
+  },
+  {
+    "severity": "LOW",
+    "title": "Inconsistent Input Prompt Format",
+    "details": "The `Read-Host` prompt for user choice mixes single character options (`A, B, U, C, Q`) with a numerical range (`3-9`). While understandable, explicitly listing all options or standardizing the format (e.g., always using ranges where appropriate or always listing individual options) could improve clarity for all users, including those using screen readers.",
+    "file": "iOS-VCAM-Launcher.ps1",
+    "line": 3960,
+    "recommendation": "Standardize the format for listing available options in the `Read-Host` prompt. For example, explicitly list all numerical options (e.g., `[A, B, U, 1, 3, 4, 5, 6, 7, 8, 9, C, Q]`) or use a more descriptive prompt."
+  }
+]
+```
+
+The changes in the PowerShell launcher script are primarily cosmetic, reordering the "USB STREAMING (SSH Tunnel)" menu option and updating the corresponding input prompt.
+
+The main areas for improvement are related to **accessibility**: the hardcoded use of various colors for menu text may lead to poor contrast for users with visual impairments. A minor point is the slightly inconsistent formatting of the input prompt, which could be made clearer for all users. The changes introduce no new security, performance, or platform compatibility issues.
