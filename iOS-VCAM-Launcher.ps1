@@ -2258,12 +2258,14 @@ extern int memorystatus_control(uint32_t command, int32_t pid, uint32_t flags, v
 typedef struct memorystatus_priority_properties { int32_t priority; uint64_t user_data; } memorystatus_priority_properties_t;
 int main(int argc, char *argv[]) {
     if (argc < 3) { printf("Usage: jetsamctl -p <priority> <pid>\n"); return 1; }
-    int opt, priority = -1;
-    while ((opt = getopt(argc, argv, "p:l:")) != -1) { if (opt == 'p') priority = atoi(optarg); }
+    int opt; long priority = -1; char *pend;
+    while ((opt = getopt(argc, argv, "p:l:")) != -1) {
+        if (opt == 'p') { errno = 0; priority = strtol(optarg, &pend, 10);
+            if (errno || *pend || priority < 0 || priority > 100) { fprintf(stderr, "Invalid priority\n"); return 1; } } }
     if (optind >= argc) { fprintf(stderr, "Expected PID\n"); return 1; }
     char *endptr; errno = 0;
     long lpid = strtol(argv[optind], &endptr, 10);
-    if (errno || *endptr || lpid <= 0) { fprintf(stderr, "Invalid PID\n"); return 1; }
+    if (errno || *endptr || lpid <= 0 || lpid > 99999) { fprintf(stderr, "Invalid PID\n"); return 1; }
     pid_t pid = (pid_t)lpid;
     if (priority >= 0) {
         memorystatus_priority_properties_t props = { .priority = priority, .user_data = 0 };

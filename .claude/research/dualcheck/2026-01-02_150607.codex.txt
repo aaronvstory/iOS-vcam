@@ -1,0 +1,190 @@
+OpenAI Codex v0.77.0 (research preview)
+--------
+workdir: F:\claude\iOS-Vcam-server\iOS-VCAM-v4.2-Distribution
+model: gpt-5.2-codex
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: auto
+session id: 019b80f6-d89e-7b43-9252-a5d9a0010109
+--------
+user
+You are reviewing PowerShell code fixes for an iOS jailbreak tool.
+
+CONTEXT: This commit fixes issues identified in a previous review:
+1. Fixed SSHD PID lookup (removed grep -v that filtered out valid sshd)
+2. Added numeric PID filter to ensure only running processes are selected
+3. Added 82flex to TrollVNC pattern for alternate bundle IDs
+4. Added #include <stdint.h> to embedded C source
+5. Replaced atoi() with strtol() for proper PID validation
+6. Using absolute path /var/jb/usr/bin/jetsamctl
+
+Verify these fixes are correct and check for any remaining issues.
+
+OUTPUT REQUIREMENTS:
+1) Start with a JSON array in a single fenced block (```json). Each item: {"severity": "CRITICAL|HIGH|MEDIUM|LOW", "title": "...", "details": "...", "file": "...", "line": "...", "recommendation": "..."}.
+2) Then provide a short human summary.
+
+INPUT (diff):
+
+commit 431793230982963ab01e28f63118413bdcef5051
+Author: a <aaron.v.story@outlook.com>
+Date:   Fri Jan 2 14:27:34 2026 -0800
+
+    fix: address dualcheck review findings for jetsamctl
+    
+    Fixes identified by Gemini + Codex dual verification:
+    
+    HIGH:
+    - Fixed SSHD PID lookup: removed grep -v filter that excluded valid sshd line
+    - Fixed fragile PID detection: added numeric filter `$1 ~ /^[0-9]+$/`
+    
+    MEDIUM:
+    - Added 82flex to TrollVNC pattern for alternate bundle IDs
+    - Added #include <stdint.h> to embedded C source
+    - Replaced atoi() with strtol() for proper PID validation
+    
+    LOW:
+    - Using absolute path /var/jb/usr/bin/jetsamctl instead of relying on PATH
+    
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+
+diff --git a/iOS-VCAM-Launcher.ps1 b/iOS-VCAM-Launcher.ps1
+index 594c362..e855e6d 100644
+--- a/iOS-VCAM-Launcher.ps1
++++ b/iOS-VCAM-Launcher.ps1
+@@ -2246,10 +2246,11 @@ perl -i -0777 -pe 's|(</dict>\s*</plist>)|<key>JetsamMemoryLimit</key>\n\t<integ
+         # Compile jetsamctl from source (since it's not in repos)
+         $compileCmd = @'
+ cat > /tmp/jetsamctl.c << 'EOFC'
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <stdint.h>
+ #include <errno.h>
+ #include <string.h>
+ #include <unistd.h>
+ #include <sys/sysctl.h>
+ #define MEMORYSTATUS_CMD_SET_PRIORITY_PROPERTIES 7
+@@ -2258,11 +2259,14 @@ typedef struct memorystatus_priority_properties { int32_t priority; uint64_t use
+ int main(int argc, char *argv[]) {
+     if (argc < 3) { printf("Usage: jetsamctl -p <priority> <pid>\n"); return 1; }
+     int opt, priority = -1;
+     while ((opt = getopt(argc, argv, "p:l:")) != -1) { if (opt == 'p') priority = atoi(optarg); }
+     if (optind >= argc) { fprintf(stderr, "Expected PID\n"); return 1; }
+-    pid_t pid = atoi(argv[optind]);
++    char *endptr; errno = 0;
++    long lpid = strtol(argv[optind], &endptr, 10);
++    if (errno || *endptr || lpid <= 0) { fprintf(stderr, "Invalid PID\n"); return 1; }
++    pid_t pid = (pid_t)lpid;
+     if (priority >= 0) {
+         memorystatus_priority_properties_t props = { .priority = priority, .user_data = 0 };
+         if (memorystatus_control(MEMORYSTATUS_CMD_SET_PRIORITY_PROPERTIES, pid, 0, &props, sizeof(props)) != 0) {
+             fprintf(stderr, "Failed: %s\n", strerror(errno)); return 1;
+         }
+@@ -2289,15 +2293,15 @@ cd /tmp && clang -o jetsamctl jetsamctl.c 2>&1 && ldid -S jetsamctl && cp jetsam
+     # Apply runtime protection to TrollVNC and sshd (if jetsamctl exists now)
+     # Use launchctl to find PIDs (pgrep not available on all jailbreaks)
+     # Priority 18 = critical system daemon level (higher = less likely to be killed)
+     Write-Host "  🛡️ Applying runtime jetsam protection..." -ForegroundColor Cyan
+     $jetsamApplyCmd = @'
+-VNC_PID=$(launchctl list 2>/dev/null | grep -i trollvnc | awk '{print $1}' | head -1)
+-SSHD_PID=$(launchctl list 2>/dev/null | grep "com.openssh.sshd" | grep -v "com.openssh.sshd$" | awk '{print $1}' | head -1)
++VNC_PID=$(launchctl list 2>/dev/null | grep -iE 'trollvnc|82flex' | awk '$1 ~ /^[0-9]+$/ {print $1; exit}')
++SSHD_PID=$(launchctl list 2>/dev/null | grep 'com.openssh.sshd' | awk '$1 ~ /^[0-9]+$/ {print $1; exit}')
+ VNC_OK=0; SSHD_OK=0
+-if [ -n "$VNC_PID" ] && [ "$VNC_PID" != "-" ]; then jetsamctl -p 18 $VNC_PID 2>/dev/null && VNC_OK=1; fi
+-if [ -n "$SSHD_PID" ] && [ "$SSHD_PID" != "-" ]; then jetsamctl -p 18 $SSHD_PID 2>/dev/null && SSHD_OK=1; fi
++if [ -n "$VNC_PID" ]; then /var/jb/usr/bin/jetsamctl -p 18 $VNC_PID 2>/dev/null && VNC_OK=1; fi
++if [ -n "$SSHD_PID" ]; then /var/jb/usr/bin/jetsamctl -p 18 $SSHD_PID 2>/dev/null && SSHD_OK=1; fi
+ echo "VNC_PID=$VNC_PID VNC_OK=$VNC_OK SSHD_PID=$SSHD_PID SSHD_OK=$SSHD_OK"
+ '@
+     $jetsamApplyArgs = $plinkBaseArgs + @($jetsamApplyCmd)
+     $jetsamResult = (& "$plinkPath" $jetsamApplyArgs 2>&1) | Out-String
+ 
+
+mcp: chromedevtools starting
+mcp: sequential-thinking starting
+mcp: serena starting
+mcp: exa starting
+mcp: github starting
+mcp: desktop-commander starting
+mcp: subagents starting
+mcp: exa ready
+mcp: github ready
+mcp: sequential-thinking ready
+mcp: subagents ready
+mcp: chromedevtools ready
+mcp: desktop-commander ready
+mcp: serena ready
+mcp startup: ready: exa, github, sequential-thinking, subagents, chromedevtools, desktop-commander, serena
+
+thinking
+**Listing remaining code issues and validations**
+
+I'll summarize the remaining issues as JSON: using `atoi` for priority without validation risking negative or zero values, `strtol` for pid parsing lacking an upper bound check which could overflow, and the broad '82flex' pattern potentially matching unrelated strings. The fixes mostly look correct, but these validation and pattern concerns remain, so I'll produce a concise JSON listing these with approximate line numbers.
+codex
+```json
+[
+  {
+    "severity": "MEDIUM",
+    "title": "Priority parsing still uses atoi without validation",
+    "details": "The new PID validation is solid, but the priority option still uses atoi(optarg). Non-numeric input (or overflow) silently maps to 0, which can change jetsam behavior without error. This undercuts the intent of the PID validation improvement.",
+    "file": "iOS-VCAM-Launcher.ps1",
+    "line": "2260",
+    "recommendation": "Parse priority with strtol (like PID), validate full numeric input, and bound-check the allowed priority range before applying."
+  },
+  {
+    "severity": "LOW",
+    "title": "PID range not bounded before casting to pid_t",
+    "details": "strtol() validation now rejects non-numeric/negative PIDs, but values larger than pid_t can still be accepted and truncated when cast. That could result in applying jetsam to the wrong process if a huge number is provided.",
+    "file": "iOS-VCAM-Launcher.ps1",
+    "line": "2263",
+    "recommendation": "Add an upper-bound check against PID_MAX (or INT_MAX if PID_MAX is unavailable) before casting to pid_t."
+  },
+  {
+    "severity": "LOW",
+    "title": "TrollVNC pattern may match unrelated labels",
+    "details": "The regex 'trollvnc|82flex' is intentionally broader, but it can also match labels that merely contain '82flex' in other contexts, which could pick the wrong PID if multiple matches exist.",
+    "file": "iOS-VCAM-Launcher.ps1",
+    "line": "2295",
+    "recommendation": "Prefer more precise label matching (e.g., full bundle IDs or anchored patterns) or restrict matches to known TrollVNC labels."
+  }
+]
+```
+
+Fixes look correct overall: the SSHD PID lookup no longer filters the valid line, the numeric PID filter prevents '-' and non-PID rows, the additional TrollVNC bundle keyword is applied, the C include is valid for int32_t usage, strtol improves PID validation, and the absolute jetsamctl path is appropriate. Remaining issues are minor/medium and mostly about input validation precision and pattern specificity.
+tokens used
+25,370
+```json
+[
+  {
+    "severity": "MEDIUM",
+    "title": "Priority parsing still uses atoi without validation",
+    "details": "The new PID validation is solid, but the priority option still uses atoi(optarg). Non-numeric input (or overflow) silently maps to 0, which can change jetsam behavior without error. This undercuts the intent of the PID validation improvement.",
+    "file": "iOS-VCAM-Launcher.ps1",
+    "line": "2260",
+    "recommendation": "Parse priority with strtol (like PID), validate full numeric input, and bound-check the allowed priority range before applying."
+  },
+  {
+    "severity": "LOW",
+    "title": "PID range not bounded before casting to pid_t",
+    "details": "strtol() validation now rejects non-numeric/negative PIDs, but values larger than pid_t can still be accepted and truncated when cast. That could result in applying jetsam to the wrong process if a huge number is provided.",
+    "file": "iOS-VCAM-Launcher.ps1",
+    "line": "2263",
+    "recommendation": "Add an upper-bound check against PID_MAX (or INT_MAX if PID_MAX is unavailable) before casting to pid_t."
+  },
+  {
+    "severity": "LOW",
+    "title": "TrollVNC pattern may match unrelated labels",
+    "details": "The regex 'trollvnc|82flex' is intentionally broader, but it can also match labels that merely contain '82flex' in other contexts, which could pick the wrong PID if multiple matches exist.",
+    "file": "iOS-VCAM-Launcher.ps1",
+    "line": "2295",
+    "recommendation": "Prefer more precise label matching (e.g., full bundle IDs or anchored patterns) or restrict matches to known TrollVNC labels."
+  }
+]
+```
+
+Fixes look correct overall: the SSHD PID lookup no longer filters the valid line, the numeric PID filter prevents '-' and non-PID rows, the additional TrollVNC bundle keyword is applied, the C include is valid for int32_t usage, strtol improves PID validation, and the absolute jetsamctl path is appropriate. Remaining issues are minor/medium and mostly about input validation precision and pattern specificity.
