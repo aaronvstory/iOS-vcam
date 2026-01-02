@@ -2240,39 +2240,81 @@ perl -i -0777 -pe 's|(</dict>\s*</plist>)|<key>JetsamMemoryLimit</key>\n\t<integ
     $jetsamCheckResult = (& "$plinkPath" $jetsamCheckArgs 2>&1) | Out-String
 
     if ($jetsamCheckResult -match 'JETSAMCTL_MISSING') {
-        Write-Host "  ⚠️ jetsamctl not installed! VNC may crash when camera apps open" -ForegroundColor Yellow
-        Write-Host "     Install: apt install jetsamctl (from BigBoss/Havoc repo)" -ForegroundColor Gray
-        Write-Host "     Or download: https://github.com/conradev/jetsamctl" -ForegroundColor Gray
-        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] WARNING: jetsamctl not found - VNC vulnerable to camera app kills"
-    } else {
-        # Apply runtime protection to TrollVNC and sshd
-        # Priority 18 = critical system daemon level (higher = less likely to be killed)
-        $jetsamApplyCmd = @'
-VNC_PID=$(pgrep -f 'TrollVNC|trollvnc|com.82flex' | head -1)
-SSHD_PID=$(pgrep -x sshd | head -1)
+        Write-Host "  🔧 jetsamctl not found - compiling from source..." -ForegroundColor Cyan
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] jetsamctl missing - attempting to compile"
+
+        # Compile jetsamctl from source (since it's not in repos)
+        $compileCmd = @'
+cat > /tmp/jetsamctl.c << 'EOFC'
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/sysctl.h>
+#define MEMORYSTATUS_CMD_SET_PRIORITY_PROPERTIES 7
+extern int memorystatus_control(uint32_t command, int32_t pid, uint32_t flags, void *buffer, size_t buffersize);
+typedef struct memorystatus_priority_properties { int32_t priority; uint64_t user_data; } memorystatus_priority_properties_t;
+int main(int argc, char *argv[]) {
+    if (argc < 3) { printf("Usage: jetsamctl -p <priority> <pid>\n"); return 1; }
+    int opt, priority = -1;
+    while ((opt = getopt(argc, argv, "p:l:")) != -1) { if (opt == 'p') priority = atoi(optarg); }
+    if (optind >= argc) { fprintf(stderr, "Expected PID\n"); return 1; }
+    pid_t pid = atoi(argv[optind]);
+    if (priority >= 0) {
+        memorystatus_priority_properties_t props = { .priority = priority, .user_data = 0 };
+        if (memorystatus_control(MEMORYSTATUS_CMD_SET_PRIORITY_PROPERTIES, pid, 0, &props, sizeof(props)) != 0) {
+            fprintf(stderr, "Failed: %s\n", strerror(errno)); return 1;
+        }
+        printf("Set priority %d for PID %d\n", priority, pid);
+    }
+    return 0;
+}
+EOFC
+cd /tmp && clang -o jetsamctl jetsamctl.c 2>&1 && ldid -S jetsamctl && cp jetsamctl /var/jb/usr/bin/ && chmod +x /var/jb/usr/bin/jetsamctl && which jetsamctl && echo COMPILE_OK
+'@
+        $compileArgs = $plinkBaseArgs + @($compileCmd)
+        $compileResult = (& "$plinkPath" $compileArgs 2>&1) | Out-String
+
+        if ($compileResult -match 'COMPILE_OK') {
+            Write-Host "  ✅ jetsamctl compiled and installed" -ForegroundColor Green
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] jetsamctl compiled successfully"
+        } else {
+            Write-Host "  ❌ Failed to compile jetsamctl (clang/ldid may be missing)" -ForegroundColor Red
+            Write-Host "     VNC may crash when camera apps open" -ForegroundColor Yellow
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] jetsamctl compile FAILED: $compileResult"
+        }
+    }
+
+    # Apply runtime protection to TrollVNC and sshd (if jetsamctl exists now)
+    # Use launchctl to find PIDs (pgrep not available on all jailbreaks)
+    # Priority 18 = critical system daemon level (higher = less likely to be killed)
+    Write-Host "  🛡️ Applying runtime jetsam protection..." -ForegroundColor Cyan
+    $jetsamApplyCmd = @'
+VNC_PID=$(launchctl list 2>/dev/null | grep -i trollvnc | awk '{print $1}' | head -1)
+SSHD_PID=$(launchctl list 2>/dev/null | grep "com.openssh.sshd" | grep -v "com.openssh.sshd$" | awk '{print $1}' | head -1)
 VNC_OK=0; SSHD_OK=0
-if [ -n "$VNC_PID" ]; then jetsamctl -p 18 $VNC_PID 2>/dev/null && VNC_OK=1; fi
-if [ -n "$SSHD_PID" ]; then jetsamctl -p 18 $SSHD_PID 2>/dev/null && SSHD_OK=1; fi
+if [ -n "$VNC_PID" ] && [ "$VNC_PID" != "-" ]; then jetsamctl -p 18 $VNC_PID 2>/dev/null && VNC_OK=1; fi
+if [ -n "$SSHD_PID" ] && [ "$SSHD_PID" != "-" ]; then jetsamctl -p 18 $SSHD_PID 2>/dev/null && SSHD_OK=1; fi
 echo "VNC_PID=$VNC_PID VNC_OK=$VNC_OK SSHD_PID=$SSHD_PID SSHD_OK=$SSHD_OK"
 '@
-        $jetsamApplyArgs = $plinkBaseArgs + @($jetsamApplyCmd)
-        $jetsamResult = (& "$plinkPath" $jetsamApplyArgs 2>&1) | Out-String
+    $jetsamApplyArgs = $plinkBaseArgs + @($jetsamApplyCmd)
+    $jetsamResult = (& "$plinkPath" $jetsamApplyArgs 2>&1) | Out-String
 
-        if ($jetsamResult -match 'VNC_OK=1') {
-            Write-Host "  ✅ TrollVNC jetsam protection applied (runtime)" -ForegroundColor Green
-            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] TrollVNC jetsamctl protection applied"
-        } else {
-            Write-Host "  ⚠️ TrollVNC jetsamctl failed (process not found or jetsamctl error)" -ForegroundColor Yellow
-            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] TrollVNC jetsamctl warning: $jetsamResult"
-        }
+    if ($jetsamResult -match 'VNC_OK=1') {
+        Write-Host "  ✅ TrollVNC jetsam protection applied (runtime)" -ForegroundColor Green
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] TrollVNC jetsamctl protection applied"
+    } else {
+        Write-Host "  ⚠️ TrollVNC jetsamctl failed (process not found or jetsamctl error)" -ForegroundColor Yellow
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] TrollVNC jetsamctl warning: $jetsamResult"
+    }
 
-        if ($jetsamResult -match 'SSHD_OK=1') {
-            Write-Host "  ✅ sshd jetsam protection applied (runtime)" -ForegroundColor Green
-            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] sshd jetsamctl protection applied"
-        } else {
-            Write-Host "  ⚠️ sshd jetsamctl failed (process not found or jetsamctl error)" -ForegroundColor Yellow
-            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] sshd jetsamctl warning: $jetsamResult"
-        }
+    if ($jetsamResult -match 'SSHD_OK=1') {
+        Write-Host "  ✅ sshd jetsam protection applied (runtime)" -ForegroundColor Green
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] sshd jetsamctl protection applied"
+    } else {
+        Write-Host "  ⚠️ sshd jetsamctl failed (process not found or jetsamctl error)" -ForegroundColor Yellow
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] sshd jetsamctl warning: $jetsamResult"
     }
 
     # STEP 9e: Verify tunnel will work BEFORE starting (verbose probe)
