@@ -2248,6 +2248,7 @@ perl -i -0777 -pe 's|(</dict>\s*</plist>)|<key>JetsamMemoryLimit</key>\n\t<integ
 cat > /tmp/jetsamctl.c << 'EOFC'
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
@@ -2260,7 +2261,10 @@ int main(int argc, char *argv[]) {
     int opt, priority = -1;
     while ((opt = getopt(argc, argv, "p:l:")) != -1) { if (opt == 'p') priority = atoi(optarg); }
     if (optind >= argc) { fprintf(stderr, "Expected PID\n"); return 1; }
-    pid_t pid = atoi(argv[optind]);
+    char *endptr; errno = 0;
+    long lpid = strtol(argv[optind], &endptr, 10);
+    if (errno || *endptr || lpid <= 0) { fprintf(stderr, "Invalid PID\n"); return 1; }
+    pid_t pid = (pid_t)lpid;
     if (priority >= 0) {
         memorystatus_priority_properties_t props = { .priority = priority, .user_data = 0 };
         if (memorystatus_control(MEMORYSTATUS_CMD_SET_PRIORITY_PROPERTIES, pid, 0, &props, sizeof(props)) != 0) {
@@ -2291,11 +2295,11 @@ cd /tmp && clang -o jetsamctl jetsamctl.c 2>&1 && ldid -S jetsamctl && cp jetsam
     # Priority 18 = critical system daemon level (higher = less likely to be killed)
     Write-Host "  🛡️ Applying runtime jetsam protection..." -ForegroundColor Cyan
     $jetsamApplyCmd = @'
-VNC_PID=$(launchctl list 2>/dev/null | grep -i trollvnc | awk '{print $1}' | head -1)
-SSHD_PID=$(launchctl list 2>/dev/null | grep "com.openssh.sshd" | grep -v "com.openssh.sshd$" | awk '{print $1}' | head -1)
+VNC_PID=$(launchctl list 2>/dev/null | grep -iE 'trollvnc|82flex' | awk '$1 ~ /^[0-9]+$/ {print $1; exit}')
+SSHD_PID=$(launchctl list 2>/dev/null | grep 'com.openssh.sshd' | awk '$1 ~ /^[0-9]+$/ {print $1; exit}')
 VNC_OK=0; SSHD_OK=0
-if [ -n "$VNC_PID" ] && [ "$VNC_PID" != "-" ]; then jetsamctl -p 18 $VNC_PID 2>/dev/null && VNC_OK=1; fi
-if [ -n "$SSHD_PID" ] && [ "$SSHD_PID" != "-" ]; then jetsamctl -p 18 $SSHD_PID 2>/dev/null && SSHD_OK=1; fi
+if [ -n "$VNC_PID" ]; then /var/jb/usr/bin/jetsamctl -p 18 $VNC_PID 2>/dev/null && VNC_OK=1; fi
+if [ -n "$SSHD_PID" ]; then /var/jb/usr/bin/jetsamctl -p 18 $SSHD_PID 2>/dev/null && SSHD_OK=1; fi
 echo "VNC_PID=$VNC_PID VNC_OK=$VNC_OK SSHD_PID=$SSHD_PID SSHD_OK=$SSHD_OK"
 '@
     $jetsamApplyArgs = $plinkBaseArgs + @($jetsamApplyCmd)
