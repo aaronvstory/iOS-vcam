@@ -2223,6 +2223,10 @@ perl -i -0777 -pe 'if (!s|(<key>EnablePressuredExit</key>)|<key>JetsamMemoryLimi
 
     if ($sshdJetsamCount -match '^0') {
         Write-Host "  🔧 Adding jetsam keys to sshd plist (one-time)..." -ForegroundColor Cyan
+        # NOTE: Unlike TrollVNC, we do NOT reload sshd after modifying the plist because:
+        # 1. We are currently using sshd for this SSH connection - reloading would kill our session
+        # 2. Plist-based jetsam keys are ignored by rootless jailbreaks anyway
+        # 3. The REAL fix is jetsamctl runtime protection applied below
         $sshdFixCmd = @'
 perl -i -0777 -pe 's|(</dict>\s*</plist>)|<key>JetsamMemoryLimit</key>\n\t<integer>-1</integer>\n\t<key>JetsamPriority</key>\n\t<integer>18</integer>\n\t<key>EnablePressuredExit</key>\n\t<false/>\n$1|s' /var/jb/Library/LaunchDaemons/com.openssh.sshd.plist 2>/dev/null && echo PLIST_SSHD_OK
 '@
