@@ -119,6 +119,16 @@ Stream RTMP from iPhone to PC over USB cable using SSH reverse tunneling. Elimin
 - Pre-built .deb: `ios/modified_debs/iosvcam_base_127_10_10_10.deb`
 - Full docs: `tasks/USB-SSH-STREAMING-GUIDE.md`
 
+**Jetsam Protection (Auto-Applied):**
+The launcher automatically applies jetsam protection to TrollVNC and sshd daemons when starting USB streaming. This prevents iOS from killing these processes when 3rd party camera apps (Safari, etc.) request camera access.
+
+| Daemon | Protection Added |
+|--------|------------------|
+| TrollVNC | `JetsamMemoryLimit=-1`, `JetsamPriority=18` |
+| sshd | `JetsamMemoryLimit=-1`, `JetsamPriority=18`, `EnablePressuredExit=false` |
+
+This fix is applied once per iPhone reboot (persists in `/var/jb/Library/LaunchDaemons/`). See `docs/USB-Camera-Conflict-Analysis.md` for details.
+
 ### CRITICAL: After iPhone Reboot / Re-Jailbreak
 
 USB streaming will fail after reboot until these are restored (see `docs/Post-Reboot-Checklist.md`):
@@ -244,6 +254,9 @@ User-facing wiki documentation lives in `docs/`:
 | `Streaming-Guide.md` | WiFi/USB streaming howto |
 | `Troubleshooting.md` | Common issues and fixes |
 | `Advanced-Features.md` | SSH, debranding, Frida, architecture |
+| `iPhone-SSH-Quick-Reference.md` | SSH via USB (iproxy + plink) - device UDIDs, credentials |
+| `USB-Streaming-Debugging.md` | Comprehensive USB tunnel debugging guide |
+| `Post-Reboot-Checklist.md` | Recovery steps after iPhone reboot |
 
 **Maintenance Rules:**
 - When menu options change, update references in docs (e.g., "Option [3]")

@@ -268,8 +268,8 @@ function Show-NetworkAdapterSelection {
     # Method 1: Try WMI first (most reliable on Windows)
     try {
         Write-Log "Attempting WMI network adapter detection"
-        $wmiAdapters = Get-WmiObject -Class Win32_NetworkAdapter -Filter "NetEnabled='True'" -ErrorAction Stop
-        $wmiConfig = Get-WmiObject -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled='True'" -ErrorAction Stop
+        $wmiAdapters = Get-CimInstance -Class Win32_NetworkAdapter -Filter "NetEnabled='True'" -ErrorAction Stop
+        $wmiConfig = Get-CimInstance -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled='True'" -ErrorAction Stop
 
         foreach ($adapter in $wmiAdapters) {
             $config = $wmiConfig | Where-Object { $_.Index -eq $adapter.Index }
@@ -414,7 +414,7 @@ function Get-NetworkInfo {
 
             # Try WMI verification
             try {
-                $wmiConfig = Get-WmiObject -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled='True'" -ErrorAction Stop
+                $wmiConfig = Get-CimInstance -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled='True'" -ErrorAction Stop
                 foreach ($cfg in $wmiConfig) {
                     if ($cfg.IPAddress -contains $config.PreferredIP) {
                         $verifyIP = $true
@@ -453,8 +453,8 @@ function Get-NetworkInfo {
 
     # Method 1: Try WMI first (most reliable)
     try {
-        $wmiAdapters = Get-WmiObject -Class Win32_NetworkAdapter -Filter "NetEnabled='True'" -ErrorAction Stop
-        $wmiConfig = Get-WmiObject -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled='True'" -ErrorAction Stop
+        $wmiAdapters = Get-CimInstance -Class Win32_NetworkAdapter -Filter "NetEnabled='True'" -ErrorAction Stop
+        $wmiConfig = Get-CimInstance -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled='True'" -ErrorAction Stop
 
         foreach ($adapter in $wmiAdapters) {
             $config = $wmiConfig | Where-Object { $_.Index -eq $adapter.Index }
@@ -1331,13 +1331,16 @@ function Stop-UsbStreamingProcesses {
 
     $processesKilled = 0
 
-    # Kill iproxy processes
-    $iproxyProcs = Get-Process -Name "iproxy" -ErrorAction SilentlyContinue
+    # Kill only VCAM's iproxy (port 2222) - preserve VNC iproxy (5901/5902)
+    # Use strict pattern: match " 2222 22" or "-u UDID 2222 22" to avoid false positives
+    # (e.g., don't match if UDID happens to contain "2222")
+    $iproxyProcs = Get-CimInstance Win32_Process -Filter "Name='iproxy.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -match '\s2222\s+22\b' }
     if ($iproxyProcs) {
         foreach ($proc in $iproxyProcs) {
             try {
-                if (-not $Silent) { Write-Host "  🔥 Stopping iproxy (PID: $($proc.Id))" -ForegroundColor Red }
-                Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+                if (-not $Silent) { Write-Host "  🔥 Stopping iproxy SSH (PID: $($proc.ProcessId))" -ForegroundColor Red }
+                Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
                 $processesKilled++
             } catch { }
         }
@@ -1908,9 +1911,21 @@ function Start-MonibucaViaSshUsb {
     # ============================================================================
     Write-Host "[STEP 6/9] 🚀 Starting iproxy (USB → SSH forwarding)..." -ForegroundColor Yellow
 
+    # CRITICAL: Validate UDID before starting (prevents silent failure)
+    if (-not $selectedUDID -or $selectedUDID.Trim() -eq '') {
+        Write-Host "  ❌ No device UDID selected! Cannot start iproxy." -ForegroundColor Red
+        Write-Host "     Ensure an iOS device is connected via USB and detected." -ForegroundColor Yellow
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP6: FAILED - No UDID selected"
+        $allReady = $false
+        Write-Host ""
+        Read-Host "Press Enter to return to menu..."
+        return
+    }
+
     # Run iproxy hidden - it just forwards ports, no user interaction needed
+    # CRITICAL: Use -u flag to bind to specific UDID (prevents wrong-device issues)
     $iproxyCommand = @"
-& "$iproxyPath" 2222 22 "$selectedUDID"
+& "$iproxyPath" -u "$selectedUDID" 2222 22
 "@
 
     Start-Process powershell -ArgumentList "-ExecutionPolicy", "Bypass", "-Command", $iproxyCommand -WindowStyle Hidden
@@ -2060,7 +2075,7 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
     # Uses -4 to force IPv4 (avoids ::1 connection refused noise)
     function Get-SshFingerprint {
         param([string]$PlinkExe, [string]$Password)
-        $out = (& $PlinkExe -4 -ssh -batch -T -no-antispoof -P 2222 -pw $Password root@127.0.0.1 exit 2>&1) | Out-String
+        $out = (& $PlinkExe -4 -ssh -batch -T -P 2222 -pw $Password root@127.0.0.1 exit 2>&1) | Out-String
         if ($out -match 'SHA256:[A-Za-z0-9+/=]+') {
             return $Matches[0]
         }
@@ -2076,7 +2091,7 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
             [string]$Fingerprint,
             [string]$Command
         )
-        $plinkArgs = @('-4', '-ssh', '-batch', '-T', '-no-antispoof', '-P', '2222', '-pw', $Password, 'root@127.0.0.1', $Command)
+        $plinkArgs = @('-4', '-ssh', '-batch', '-T', '-P', '2222', '-pw', $Password, 'root@127.0.0.1', $Command)
         if ($Fingerprint) { $plinkArgs = @('-hostkey', $Fingerprint) + $plinkArgs }
 
         $result = (& $PlinkExe $plinkArgs 2>&1) | Out-String
@@ -2085,7 +2100,7 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
         if ($result -match 'Host key not in manually configured list') {
             $newFp = Get-SshFingerprint -PlinkExe $PlinkExe -Password $Password
             if ($newFp) {
-                $plinkArgs = @('-hostkey', $newFp, '-4', '-ssh', '-batch', '-T', '-no-antispoof', '-P', '2222', '-pw', $Password, 'root@127.0.0.1', $Command)
+                $plinkArgs = @('-hostkey', $newFp, '-4', '-ssh', '-batch', '-T', '-P', '2222', '-pw', $Password, 'root@127.0.0.1', $Command)
                 $result = (& $PlinkExe $plinkArgs 2>&1) | Out-String
                 return @{ Output = $result; Fingerprint = $newFp }
             }
@@ -2162,7 +2177,7 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
     $aliasCmd = 'ifconfig lo0 alias 127.10.10.10 netmask 255.255.255.255; echo ALIAS_OK'
 
     # Build alias command args with hostkey if we have it
-    $aliasArgs = @('-4', '-ssh', '-batch', '-T', '-no-antispoof', '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1', $aliasCmd)
+    $aliasArgs = @('-4', '-ssh', '-batch', '-T', '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1', $aliasCmd)
     if ($hostKeyFp) {
         $aliasArgs = @('-hostkey', $hostKeyFp) + $aliasArgs
     }
@@ -2177,13 +2192,70 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
         Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] iPhone alias warning: $aliasResult"
     }
 
-    # STEP 9d: Verify tunnel will work BEFORE starting (verbose probe)
+    # STEP 9d: Apply jetsam protection to TrollVNC and sshd (prevents camera app conflicts)
+    # This protects VNC and SSH tunnel from being killed when 3rd party camera apps start
+    Write-Host "  🛡️ Checking jetsam protection for VNC/sshd..." -ForegroundColor Gray
+
+    # Build base plink args
+    $plinkBaseArgs = @('-4', '-ssh', '-batch', '-T', '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1')
+    if ($hostKeyFp) { $plinkBaseArgs = @('-hostkey', $hostKeyFp) + $plinkBaseArgs }
+
+    # Check if TrollVNC has jetsam protection
+    $vncCheckCmd = 'grep -c JetsamMemoryLimit /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null || echo 0'
+    $vncCheckArgs = $plinkBaseArgs + @($vncCheckCmd)
+    $vncJetsamCount = (& "$plinkPath" $vncCheckArgs 2>&1) | Out-String
+
+    if ($vncJetsamCount -match '^0') {
+        Write-Host "  🔧 Adding jetsam protection to TrollVNC..." -ForegroundColor Cyan
+        # Use perl to insert JetsamMemoryLimit and JetsamPriority before EnablePressuredExit or at end of dict
+        $vncFixCmd = @'
+perl -i -0777 -pe 's|(<key>EnablePressuredExit</key>)|<key>JetsamMemoryLimit</key>\n\t<integer>-1</integer>\n\t<key>JetsamPriority</key>\n\t<integer>18</integer>\n\t$1|s' /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null && launchctl unload /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null; launchctl load /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null && echo JETSAM_VNC_OK
+'@
+        $vncFixArgs = $plinkBaseArgs + @($vncFixCmd)
+        $vncFixResult = (& "$plinkPath" $vncFixArgs 2>&1) | Out-String
+        if ($vncFixResult -match 'JETSAM_VNC_OK') {
+            Write-Host "  ✅ TrollVNC jetsam protection applied" -ForegroundColor Green
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] TrollVNC jetsam protection applied"
+        } else {
+            Write-Host "  ⚠️ TrollVNC jetsam protection may have failed (VNC may crash on camera use)" -ForegroundColor Yellow
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] TrollVNC jetsam protection warning: $vncFixResult"
+        }
+    } else {
+        Write-Host "  ✅ TrollVNC already has jetsam protection" -ForegroundColor Green
+    }
+
+    # Check if sshd has jetsam protection
+    $sshdCheckCmd = 'grep -c JetsamMemoryLimit /var/jb/Library/LaunchDaemons/com.openssh.sshd.plist 2>/dev/null || echo 0'
+    $sshdCheckArgs = $plinkBaseArgs + @($sshdCheckCmd)
+    $sshdJetsamCount = (& "$plinkPath" $sshdCheckArgs 2>&1) | Out-String
+
+    if ($sshdJetsamCount -match '^0') {
+        Write-Host "  🔧 Adding jetsam protection to sshd..." -ForegroundColor Cyan
+        # Insert before closing </dict></plist>
+        $sshdFixCmd = @'
+perl -i -0777 -pe 's|(</dict>\s*</plist>)|<key>JetsamMemoryLimit</key>\n\t<integer>-1</integer>\n\t<key>JetsamPriority</key>\n\t<integer>18</integer>\n\t<key>EnablePressuredExit</key>\n\t<false/>\n$1|s' /var/jb/Library/LaunchDaemons/com.openssh.sshd.plist 2>/dev/null && echo JETSAM_SSHD_OK
+'@
+        $sshdFixArgs = $plinkBaseArgs + @($sshdFixCmd)
+        $sshdFixResult = (& "$plinkPath" $sshdFixArgs 2>&1) | Out-String
+        if ($sshdFixResult -match 'JETSAM_SSHD_OK') {
+            Write-Host "  ✅ sshd jetsam protection applied" -ForegroundColor Green
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] sshd jetsam protection applied"
+        } else {
+            Write-Host "  ⚠️ sshd jetsam protection may have failed" -ForegroundColor Yellow
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] sshd jetsam protection warning: $sshdFixResult"
+        }
+    } else {
+        Write-Host "  ✅ sshd already has jetsam protection" -ForegroundColor Green
+    }
+
+    # STEP 9e: Verify tunnel will work BEFORE starting (verbose probe)
     # Uses -4 and 127.0.0.1 to avoid IPv6 "Connection refused" false positives
+    # CRITICAL: Use DIFFERENT test ports (18080/11935) to avoid race condition with real tunnel
     Write-Host "  🔍 Verifying tunnel acceptance..." -ForegroundColor Gray
 
-    $verifyArgs = @('-4', '-v', '-ssh', '-batch', '-T', '-no-antispoof',
-        '-R', '127.10.10.10:80:127.0.0.1:80',
-        '-R', '127.10.10.10:1935:127.0.0.1:1935',
+    $verifyArgs = @('-4', '-v', '-ssh', '-batch', '-T',
+        '-R', '127.10.10.10:18080:127.0.0.1:80',
+        '-R', '127.10.10.10:11935:127.0.0.1:1935',
         '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1', 'echo PROBE; exit')
     if ($hostKeyFp) { $verifyArgs = @('-hostkey', $hostKeyFp) + $verifyArgs }
 
@@ -2205,8 +2277,8 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
         Write-Host "  🔑 Host key changed, re-probing..." -ForegroundColor Cyan
         $hostKeyFp = Get-SshFingerprint -PlinkExe $plinkPath -Password $sshPassword
         if ($hostKeyFp) {
-            $verifyArgs = @('-hostkey', $hostKeyFp, '-4', '-v', '-ssh', '-batch', '-T', '-no-antispoof',
-                '-R', '127.10.10.10:80:127.0.0.1:80', '-R', '127.10.10.10:1935:127.0.0.1:1935',
+            $verifyArgs = @('-hostkey', $hostKeyFp, '-4', '-v', '-ssh', '-batch', '-T',
+                '-R', '127.10.10.10:18080:127.0.0.1:80', '-R', '127.10.10.10:11935:127.0.0.1:1935',
                 '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1', 'echo PROBE; exit')
             $verifyOut = (& "$plinkPath" $verifyArgs 2>&1) | Out-String
             if ($verifyOut -match 'Remote port forwarding from .* enabled') {
@@ -2218,17 +2290,35 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
         }
     }
 
-    # STEP 9e: Start the actual tunnel (keep-alive with 'cat')
+    # STEP 9e: Start the actual tunnel (keep-alive with sleep)
     # Uses -4 and 127.0.0.1 to force IPv4
     if ($allReady) {
         Write-Host "  🔗 Starting SSH reverse tunnel..." -ForegroundColor Gray
 
+        # Create plink log for debugging if it dies (use same dir as UsbLogFile)
+        $plinkLogFile = $null
+        try {
+            $plinkLogDir = if ($script:UsbLogFile) { Split-Path -Parent $script:UsbLogFile } else { $null }
+            if (-not $plinkLogDir -or -not (Test-Path $plinkLogDir -IsValid)) {
+                $plinkLogDir = Join-Path $script:SRSHome "logs"
+            }
+            if (-not (Test-Path $plinkLogDir)) {
+                New-Item -ItemType Directory -Path $plinkLogDir -Force -ErrorAction Stop | Out-Null
+            }
+            $plinkLogFile = Join-Path $plinkLogDir ("plink-tunnel-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss") + ".log")
+        } catch {
+            Write-Host "  ⚠️ Could not create plink log directory, continuing without SSH logging" -ForegroundColor Yellow
+            $plinkLogFile = $null
+        }
+
         $tunnelArgs = @(
-            '-4', '-ssh', '-batch', '-T', '-no-antispoof',
+            '-4', '-ssh', '-batch', '-T',
             '-R', '127.10.10.10:80:127.0.0.1:80',
             '-R', '127.10.10.10:1935:127.0.0.1:1935',
-            '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1', 'cat'
+            '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1',
+            'sleep 31536000'  # 1 year - no quotes/shell escaping needed
         )
+        if ($plinkLogFile) { $tunnelArgs = @('-sshlog', $plinkLogFile) + $tunnelArgs }
         if ($hostKeyFp) { $tunnelArgs = @('-hostkey', $hostKeyFp) + $tunnelArgs }
 
         Start-Process -WindowStyle Hidden -FilePath "$plinkPath" -ArgumentList $tunnelArgs
@@ -2244,6 +2334,29 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
             if ($plinkStillAlive) {
                 Write-Host "  ✅ SSH tunnel running (PID: $($plinkStillAlive.Id -join ', '))" -ForegroundColor Green
                 Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel OK - plink stable"
+
+                # CRITICAL: Verify tunnels are actually bound on iPhone (not just plink alive)
+                Write-Host "  🔍 Verifying tunnel ports bound on iPhone..." -ForegroundColor Gray
+                $checkListeners = 'netstat -an | grep -E "127\.10\.10\.10\.(80|1935).*LISTEN" || echo NO_LISTENERS'
+                $listenerArgs = @('-4', '-ssh', '-batch', '-T', '-P', '2222', '-pw', $sshPassword, 'root@127.0.0.1', $checkListeners)
+                if ($hostKeyFp) { $listenerArgs = @('-hostkey', $hostKeyFp) + $listenerArgs }
+                $listenerCheck = (& $plinkPath $listenerArgs 2>&1) | Out-String
+
+                if ($listenerCheck -match 'NO_LISTENERS') {
+                    Write-Host "  ❌ Tunnel NOT listening on iPhone - ports not bound!" -ForegroundColor Red
+                    Write-Host "     Likely cause: iproxy on wrong device or sshd config issue" -ForegroundColor Yellow
+                    Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: TUNNEL NOT BOUND - listeners not found on 127.10.10.10"
+                    $allReady = $false
+                    # Cleanup stale processes to avoid confusing state
+                    Write-Host "  🧹 Cleaning up failed tunnel processes..." -ForegroundColor Gray
+                    Stop-UsbStreamingProcesses -Silent
+                } elseif ($listenerCheck -match '127\.10\.10\.10\.(80|1935)') {
+                    Write-Host "  ✅ Tunnel ports verified on iPhone (80 + 1935)" -ForegroundColor Green
+                    Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: Tunnel ports VERIFIED listening on iPhone"
+                } else {
+                    Write-Host "  ⚠️ Could not verify tunnel listeners (check manually)" -ForegroundColor Yellow
+                    Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: Listener check inconclusive: $listenerCheck"
+                }
             } else {
                 Write-Host "  ⚠️ SSH tunnel died shortly after starting!" -ForegroundColor Yellow
                 Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel DIED"
