@@ -119,15 +119,24 @@ Stream RTMP from iPhone to PC over USB cable using SSH reverse tunneling. Elimin
 - Pre-built .deb: `ios/modified_debs/iosvcam_base_127_10_10_10.deb`
 - Full docs: `docs/Streaming-Guide.md`
 
-**Jetsam Protection (Auto-Applied):**
+**Jetsam Protection (Requires jetsamctl):**
 The launcher automatically applies jetsam protection to TrollVNC and sshd daemons when starting USB streaming. This prevents iOS from killing these processes when 3rd party camera apps (Safari, etc.) request camera access.
 
-| Daemon | Protection Added |
-|--------|------------------|
-| TrollVNC | `JetsamMemoryLimit=-1`, `JetsamPriority=18` |
-| sshd | `JetsamMemoryLimit=-1`, `JetsamPriority=18`, `EnablePressuredExit=false` |
+**⚠️ PREREQUISITE: Install jetsamctl on iPhone first!**
+```bash
+apt install jetsamctl   # Or via Sileo from BigBoss/Havoc repo
+```
 
-This fix is applied once per iPhone reboot (persists in `/var/jb/Library/LaunchDaemons/`). See `docs/USB-Camera-Conflict-Analysis.md` for details.
+Without jetsamctl, VNC will crash when camera apps open. The launcher checks for it and warns if missing.
+
+| Method | Persistence | Works? |
+|--------|-------------|--------|
+| Plist modification | Persists after reboot | ❌ Ignored by rootless jailbreaks |
+| jetsamctl runtime | Needs reapply each session | ✅ Actually works |
+
+The launcher now uses **both** methods: plist (backup) + jetsamctl (primary). jetsamctl runs every USB streaming session to apply kernel-level protection.
+
+See `docs/USB-Camera-Conflict-Analysis.md` for technical details.
 
 ### CRITICAL: After iPhone Reboot / Re-Jailbreak
 

@@ -2194,59 +2194,85 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
 
     # STEP 9d: Apply jetsam protection to TrollVNC and sshd (prevents camera app conflicts)
     # This protects VNC and SSH tunnel from being killed when 3rd party camera apps start
-    Write-Host "  🛡️ Checking jetsam protection for VNC/sshd..." -ForegroundColor Gray
+    # CRITICAL: Plist modification alone is NOT reliable - modern jailbreaks ignore those keys
+    # We MUST use jetsamctl for RUNTIME protection which directly sets kernel jetsam priority
+    Write-Host "  🛡️ Applying jetsam protection for VNC/sshd..." -ForegroundColor Gray
 
     # Build base plink args
     $plinkBaseArgs = @('-4', '-ssh', '-batch', '-T', '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1')
     if ($hostKeyFp) { $plinkBaseArgs = @('-hostkey', $hostKeyFp) + $plinkBaseArgs }
 
-    # Check if TrollVNC has jetsam protection
+    # PHASE 1: Plist modification (backup approach - may be ignored by iOS)
+    # Check and add keys to plist if missing (one-time setup)
     $vncCheckCmd = 'grep -c JetsamMemoryLimit /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null || echo 0'
     $vncCheckArgs = $plinkBaseArgs + @($vncCheckCmd)
     $vncJetsamCount = (& "$plinkPath" $vncCheckArgs 2>&1) | Out-String
 
     if ($vncJetsamCount -match '^0') {
-        Write-Host "  🔧 Adding jetsam protection to TrollVNC..." -ForegroundColor Cyan
-        # Use perl to insert JetsamMemoryLimit and JetsamPriority before EnablePressuredExit if present,
-        # otherwise insert before closing </dict></plist> (fallback for plists without EnablePressuredExit)
+        Write-Host "  🔧 Adding jetsam keys to TrollVNC plist (one-time)..." -ForegroundColor Cyan
         $vncFixCmd = @'
-perl -i -0777 -pe 'if (!s|(<key>EnablePressuredExit</key>)|<key>JetsamMemoryLimit</key>\n\t<integer>-1</integer>\n\t<key>JetsamPriority</key>\n\t<integer>18</integer>\n\t$1|s) { s|(</dict>\s*</plist>)|<key>JetsamMemoryLimit</key>\n\t<integer>-1</integer>\n\t<key>JetsamPriority</key>\n\t<integer>18</integer>\n$1|s }' /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null && launchctl unload /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null; launchctl load /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null && echo JETSAM_VNC_OK
+perl -i -0777 -pe 'if (!s|(<key>EnablePressuredExit</key>)|<key>JetsamMemoryLimit</key>\n\t<integer>-1</integer>\n\t<key>JetsamPriority</key>\n\t<integer>18</integer>\n\t$1|s) { s|(</dict>\s*</plist>)|<key>JetsamMemoryLimit</key>\n\t<integer>-1</integer>\n\t<key>JetsamPriority</key>\n\t<integer>18</integer>\n$1|s }' /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null && launchctl unload /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null; launchctl load /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null && echo PLIST_VNC_OK
 '@
         $vncFixArgs = $plinkBaseArgs + @($vncFixCmd)
-        $vncFixResult = (& "$plinkPath" $vncFixArgs 2>&1) | Out-String
-        if ($vncFixResult -match 'JETSAM_VNC_OK') {
-            Write-Host "  ✅ TrollVNC jetsam protection applied" -ForegroundColor Green
-            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] TrollVNC jetsam protection applied"
-        } else {
-            Write-Host "  ⚠️ TrollVNC jetsam protection may have failed (VNC may crash on camera use)" -ForegroundColor Yellow
-            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] TrollVNC jetsam protection warning: $vncFixResult"
-        }
-    } else {
-        Write-Host "  ✅ TrollVNC already has jetsam protection" -ForegroundColor Green
+        $null = (& "$plinkPath" $vncFixArgs 2>&1)
     }
 
-    # Check if sshd has jetsam protection
     $sshdCheckCmd = 'grep -c JetsamMemoryLimit /var/jb/Library/LaunchDaemons/com.openssh.sshd.plist 2>/dev/null || echo 0'
     $sshdCheckArgs = $plinkBaseArgs + @($sshdCheckCmd)
     $sshdJetsamCount = (& "$plinkPath" $sshdCheckArgs 2>&1) | Out-String
 
     if ($sshdJetsamCount -match '^0') {
-        Write-Host "  🔧 Adding jetsam protection to sshd..." -ForegroundColor Cyan
-        # Insert before closing </dict></plist>
+        Write-Host "  🔧 Adding jetsam keys to sshd plist (one-time)..." -ForegroundColor Cyan
         $sshdFixCmd = @'
-perl -i -0777 -pe 's|(</dict>\s*</plist>)|<key>JetsamMemoryLimit</key>\n\t<integer>-1</integer>\n\t<key>JetsamPriority</key>\n\t<integer>18</integer>\n\t<key>EnablePressuredExit</key>\n\t<false/>\n$1|s' /var/jb/Library/LaunchDaemons/com.openssh.sshd.plist 2>/dev/null && echo JETSAM_SSHD_OK
+perl -i -0777 -pe 's|(</dict>\s*</plist>)|<key>JetsamMemoryLimit</key>\n\t<integer>-1</integer>\n\t<key>JetsamPriority</key>\n\t<integer>18</integer>\n\t<key>EnablePressuredExit</key>\n\t<false/>\n$1|s' /var/jb/Library/LaunchDaemons/com.openssh.sshd.plist 2>/dev/null && echo PLIST_SSHD_OK
 '@
         $sshdFixArgs = $plinkBaseArgs + @($sshdFixCmd)
-        $sshdFixResult = (& "$plinkPath" $sshdFixArgs 2>&1) | Out-String
-        if ($sshdFixResult -match 'JETSAM_SSHD_OK') {
-            Write-Host "  ✅ sshd jetsam protection applied" -ForegroundColor Green
-            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] sshd jetsam protection applied"
-        } else {
-            Write-Host "  ⚠️ sshd jetsam protection may have failed" -ForegroundColor Yellow
-            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] sshd jetsam protection warning: $sshdFixResult"
-        }
+        $null = (& "$plinkPath" $sshdFixArgs 2>&1)
+    }
+
+    # PHASE 2: Runtime jetsamctl protection (THE ACTUAL FIX - runs every session)
+    # This directly sets jetsam priority in the kernel, bypassing plist limitations
+    Write-Host "  🛡️ Applying RUNTIME jetsam protection via jetsamctl..." -ForegroundColor Cyan
+
+    # Check if jetsamctl is available
+    $jetsamCheckCmd = 'which jetsamctl 2>/dev/null && echo JETSAMCTL_FOUND || echo JETSAMCTL_MISSING'
+    $jetsamCheckArgs = $plinkBaseArgs + @($jetsamCheckCmd)
+    $jetsamCheckResult = (& "$plinkPath" $jetsamCheckArgs 2>&1) | Out-String
+
+    if ($jetsamCheckResult -match 'JETSAMCTL_MISSING') {
+        Write-Host "  ⚠️ jetsamctl not installed! VNC may crash when camera apps open" -ForegroundColor Yellow
+        Write-Host "     Install: apt install jetsamctl (from BigBoss/Havoc repo)" -ForegroundColor Gray
+        Write-Host "     Or download: https://github.com/conradev/jetsamctl" -ForegroundColor Gray
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] WARNING: jetsamctl not found - VNC vulnerable to camera app kills"
     } else {
-        Write-Host "  ✅ sshd already has jetsam protection" -ForegroundColor Green
+        # Apply runtime protection to TrollVNC and sshd
+        # Priority 18 = critical system daemon level (higher = less likely to be killed)
+        $jetsamApplyCmd = @'
+VNC_PID=$(pgrep -f 'TrollVNC|trollvnc|com.82flex' | head -1)
+SSHD_PID=$(pgrep -x sshd | head -1)
+VNC_OK=0; SSHD_OK=0
+if [ -n "$VNC_PID" ]; then jetsamctl -p 18 $VNC_PID 2>/dev/null && VNC_OK=1; fi
+if [ -n "$SSHD_PID" ]; then jetsamctl -p 18 $SSHD_PID 2>/dev/null && SSHD_OK=1; fi
+echo "VNC_PID=$VNC_PID VNC_OK=$VNC_OK SSHD_PID=$SSHD_PID SSHD_OK=$SSHD_OK"
+'@
+        $jetsamApplyArgs = $plinkBaseArgs + @($jetsamApplyCmd)
+        $jetsamResult = (& "$plinkPath" $jetsamApplyArgs 2>&1) | Out-String
+
+        if ($jetsamResult -match 'VNC_OK=1') {
+            Write-Host "  ✅ TrollVNC jetsam protection applied (runtime)" -ForegroundColor Green
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] TrollVNC jetsamctl protection applied"
+        } else {
+            Write-Host "  ⚠️ TrollVNC jetsamctl failed (process not found or jetsamctl error)" -ForegroundColor Yellow
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] TrollVNC jetsamctl warning: $jetsamResult"
+        }
+
+        if ($jetsamResult -match 'SSHD_OK=1') {
+            Write-Host "  ✅ sshd jetsam protection applied (runtime)" -ForegroundColor Green
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] sshd jetsamctl protection applied"
+        } else {
+            Write-Host "  ⚠️ sshd jetsamctl failed (process not found or jetsamctl error)" -ForegroundColor Yellow
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] sshd jetsamctl warning: $jetsamResult"
+        }
     }
 
     # STEP 9e: Verify tunnel will work BEFORE starting (verbose probe)

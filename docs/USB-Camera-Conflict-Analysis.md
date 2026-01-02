@@ -101,21 +101,43 @@ VNC client (PC)        CRASHED   "Connection gracefully closed"
 
 ## Proposed Solutions
 
-### Solution 1: Protect Processes with Jetsamctl (PRIMARY)
+### Solution 1: Protect Processes with Jetsamctl (PRIMARY - IMPLEMENTED)
 
-Raise the jetsam priority of vcam and VNC processes so iOS won't kill them for resources:
+Raise the jetsam priority of TrollVNC and sshd processes so iOS won't kill them for resources.
+
+**⚠️ CRITICAL: Why Plist Modification Alone Doesn't Work**
+
+The launcher previously modified LaunchDaemon plist files to add `JetsamMemoryLimit` and `JetsamPriority` keys. After reboot, the launcher correctly shows "already has jetsam protection" because the **plist file** still contains these keys.
+
+However, **modern rootless jailbreaks (Dopamine, etc.) IGNORE these plist keys!** The keys are hints to launchd, but the jailbreak's substitute daemon doesn't implement them. The plist persists, but the **runtime protection is never applied**.
+
+**The Real Solution: jetsamctl Runtime Protection**
+
+`jetsamctl` directly sets jetsam priority in the iOS kernel via the `memorystatus_control` syscall, bypassing plist limitations. This ACTUALLY works.
+
+**PREREQUISITE: Install jetsamctl**
 
 ```bash
-# SSH into iPhone first (see MOBILE-DEVICES-QUICKSTART.md)
-# Find process PIDs
-ps aux | grep -E "vcam|vnc|TrollVNC" | grep -v grep
+# SSH to iPhone via USB
+iproxy 2222 22 &
+ssh -p 2222 root@127.0.0.1
 
-# Protect them from jetsam (replace <PID> with actual)
-jetsamctl -p <VCAM_PID> -m -1 -P 18
-jetsamctl -p <VNC_PID> -m -1 -P 18
+# Install jetsamctl (one of these methods)
+apt install jetsamctl                    # If using apt
+sileo://package/jetsamctl                # If using Sileo
+# Or download from: https://github.com/conradev/jetsamctl
 ```
 
-**Note:** This needs to be done after each reboot. Could be automated via LaunchDaemon.
+**The launcher now automatically runs jetsamctl every session:**
+```bash
+# What the launcher does (STEP 9d)
+jetsamctl -p 18 $(pgrep TrollVNC)   # Protect VNC
+jetsamctl -p 18 $(pgrep sshd)       # Protect SSH tunnel
+```
+
+Priority 18 = critical system daemon level (higher = less likely to be killed).
+
+**Note:** Runtime jetsamctl protection is NOT persistent across reboots. The launcher applies it automatically every time you start USB streaming (Option U).
 
 ### Solution 2: Pre-Warm Camera (WORKAROUND)
 
