@@ -185,7 +185,7 @@ function Write-Log {
     if (Test-Path $script:LogFile) {
         $fileInfo = Get-Item $script:LogFile
         if ($fileInfo.Length -gt $script:MaxLogSize) {
-            $archiveFile = Join-Path $script:ConfigDir "srs-launcher.old.log"
+            $archiveFile = Join-Path $script:ConfigDir "iosvcam-launcher.old.log"
             Move-Item -Path $script:LogFile -Destination $archiveFile -Force
         }
     }
@@ -268,8 +268,8 @@ function Show-NetworkAdapterSelection {
     # Method 1: Try WMI first (most reliable on Windows)
     try {
         Write-Log "Attempting WMI network adapter detection"
-        $wmiAdapters = Get-WmiObject -Class Win32_NetworkAdapter -Filter "NetEnabled='True'" -ErrorAction Stop
-        $wmiConfig = Get-WmiObject -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled='True'" -ErrorAction Stop
+        $wmiAdapters = Get-CimInstance -Class Win32_NetworkAdapter -Filter "NetEnabled='True'" -ErrorAction Stop
+        $wmiConfig = Get-CimInstance -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled='True'" -ErrorAction Stop
 
         foreach ($adapter in $wmiAdapters) {
             $config = $wmiConfig | Where-Object { $_.Index -eq $adapter.Index }
@@ -414,7 +414,7 @@ function Get-NetworkInfo {
 
             # Try WMI verification
             try {
-                $wmiConfig = Get-WmiObject -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled='True'" -ErrorAction Stop
+                $wmiConfig = Get-CimInstance -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled='True'" -ErrorAction Stop
                 foreach ($cfg in $wmiConfig) {
                     if ($cfg.IPAddress -contains $config.PreferredIP) {
                         $verifyIP = $true
@@ -453,8 +453,8 @@ function Get-NetworkInfo {
 
     # Method 1: Try WMI first (most reliable)
     try {
-        $wmiAdapters = Get-WmiObject -Class Win32_NetworkAdapter -Filter "NetEnabled='True'" -ErrorAction Stop
-        $wmiConfig = Get-WmiObject -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled='True'" -ErrorAction Stop
+        $wmiAdapters = Get-CimInstance -Class Win32_NetworkAdapter -Filter "NetEnabled='True'" -ErrorAction Stop
+        $wmiConfig = Get-CimInstance -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled='True'" -ErrorAction Stop
 
         foreach ($adapter in $wmiAdapters) {
             $config = $wmiConfig | Where-Object { $_.Index -eq $adapter.Index }
@@ -608,7 +608,7 @@ function Show-MainMenu {
     Show-SRSAsciiArt
     Write-Host ""
     Write-Host "    " -NoNewline
-    Write-Host "iOS VCAM - perma unlock" -ForegroundColor Yellow
+    Write-Host "iOS-VCAM Server v4.2 - Streaming Toolkit" -ForegroundColor Yellow
     Write-Host "    " -NoNewline
     Write-Host "═══════════════════════════════════════════════════════════════════════════════════════════" -ForegroundColor DarkGray
     Write-Host ""
@@ -672,8 +672,15 @@ function Show-MainMenu {
     Write-Host "╚═══════════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Green
     Write-Host ""
 
+    # USB Streaming - Primary/Recommended option
+    Write-Host "  [U] 🔌 USB STREAMING (SSH Tunnel) - RECOMMENDED" -ForegroundColor Yellow
+    Write-Host "      • Most stable - direct USB connection, no WiFi needed" -ForegroundColor Gray
+    Write-Host "      • Low latency, reliable for production streaming" -ForegroundColor Gray
+    Write-Host "      • Requires: OpenSSH on iPhone + iproxy + plink" -ForegroundColor DarkGray
+    Write-Host ""
+
     if ($isMonibuca) {
-        Write-Host "  [A] 🚀 MONIBUCA STREAMING SERVER (Default)" -ForegroundColor Magenta
+        Write-Host "  [A] 🚀 MONIBUCA STREAMING SERVER (WiFi)" -ForegroundColor Magenta
         Write-Host "      • Modern, low-latency media server" -ForegroundColor Gray
         Write-Host "      • Optimized for iPhone WiFi streaming" -ForegroundColor Gray
         Write-Host "      • Uses config: $monibucaProfile" -ForegroundColor Gray
@@ -729,10 +736,6 @@ function Show-MainMenu {
     Write-Host "  [8] 📱 CREATE iOS .DEB WITH CUSTOM IP" -ForegroundColor White
     Write-Host "  [9] 🧪 USB SETUP VALIDATION" -ForegroundColor White
     Write-Host ""
-    Write-Host "  [U] 🔌 USB STREAMING (SSH Tunnel)" -ForegroundColor Magenta
-    Write-Host "      • Streams over USB without WiFi" -ForegroundColor Gray
-    Write-Host "      • Requires OpenSSH on iPhone" -ForegroundColor Gray
-    Write-Host ""
     Write-Host "  [C] ⚙️  CONFIGURATION SETTINGS" -ForegroundColor White
     Write-Host "  [Q] 🚪 QUIT" -ForegroundColor White
     Write-Host ""
@@ -768,7 +771,7 @@ function Start-CombinedFlaskAndSRS-SRS {
     Write-Host ""
 
     # Check if Python is installed for Flask
-    Write-Host "`[STEP 1/5] 🐍 Checking Python installation..." -ForegroundColor Yellow
+    Write-Host "[STEP 1/5] 🐍 Checking Python installation..." -ForegroundColor Yellow
     $pythonVersion = $null
     try {
         $pythonVersion = & python --version 2>&1
@@ -788,7 +791,7 @@ function Start-CombinedFlaskAndSRS-SRS {
     }
 
     # Check Flask installation
-    Write-Host "`[STEP 2/5`] 📦 Checking Flask installation..." -ForegroundColor Yellow
+    Write-Host "[STEP 2/5] 📦 Checking Flask installation..." -ForegroundColor Yellow
     $flaskInstalled = $false
     try {
         & python -c "import flask" 2>&1 | Out-Null
@@ -811,11 +814,11 @@ function Start-CombinedFlaskAndSRS-SRS {
     }
 
     # Clean up ports
-    Write-Host "`[STEP 3/5] 🧹 Cleaning up conflicting processes..." -ForegroundColor Yellow
+    Write-Host "[STEP 3/5] 🧹 Cleaning up conflicting processes..." -ForegroundColor Yellow
     Clear-SRSPorts
 
     # Start SRS in new window
-    Write-Host "`[STEP 4/5] 🚀 Launching SRS server in new window..." -ForegroundColor Yellow
+    Write-Host "[STEP 4/5] 🚀 Launching SRS server in new window..." -ForegroundColor Yellow
 
     # LOG: Write config check to file for debugging
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -904,7 +907,7 @@ Write-Host 'SRS Server stopped. Press any key to close...' -ForegroundColor Yell
     Start-Sleep -Seconds 2
 
     # Start Flask in a new window by default
-    Write-Host "`[STEP 5/5] 🔐 Starting Flask authentication server..." -ForegroundColor Yellow
+    Write-Host "[STEP 5/5] 🔐 Starting Flask authentication server..." -ForegroundColor Yellow
     Write-Host ""
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
     Write-Host "                     ✅ BOTH SERVERS ARE NOW RUNNING!                          " -ForegroundColor Green
@@ -1040,7 +1043,7 @@ function Start-FlaskAuthServer {
     Write-Host ""
 
     # Check if Python is installed
-    Write-Host "`[STEP 1/4] 🐍 Checking Python installation..." -ForegroundColor Yellow
+    Write-Host "[STEP 1/4] 🐍 Checking Python installation..." -ForegroundColor Yellow
     $pythonVersion = $null
     try {
         $pythonVersion = & python --version 2>&1
@@ -1060,7 +1063,7 @@ function Start-FlaskAuthServer {
     }
 
     # Check if Flask is installed
-    Write-Host "`[STEP 2/4] 📦 Checking Flask installation..." -ForegroundColor Yellow
+    Write-Host "[STEP 2/4] 📦 Checking Flask installation..." -ForegroundColor Yellow
     $flaskInstalled = $false
     try {
         & python -c "import flask" 2>&1 | Out-Null
@@ -1092,8 +1095,8 @@ function Start-FlaskAuthServer {
         }
     }
 
-    Write-Host "`[STEP 3/4] 🌐 Configuring server with IP: $script:CurrentIP" -ForegroundColor Yellow
-    Write-Host "`[STEP 4/4] 🚀 Starting Flask server..." -ForegroundColor Yellow
+    Write-Host "[STEP 3/4] 🌐 Configuring server with IP: $script:CurrentIP" -ForegroundColor Yellow
+    Write-Host "[STEP 4/4] 🚀 Starting Flask server..." -ForegroundColor Yellow
     Write-Host ""
     Write-Host "    -------------------------------------------------------------------------------------" -ForegroundColor Green
     Write-Host "  📱 Flask Server URL: http://$script:CurrentIP`:80" -ForegroundColor Green
@@ -1328,13 +1331,16 @@ function Stop-UsbStreamingProcesses {
 
     $processesKilled = 0
 
-    # Kill iproxy processes
-    $iproxyProcs = Get-Process -Name "iproxy" -ErrorAction SilentlyContinue
+    # Kill only VCAM's iproxy (port 2222) - preserve VNC iproxy (5901/5902)
+    # Use strict pattern: match " 2222 22" or "-u UDID 2222 22" to avoid false positives
+    # (e.g., don't match if UDID happens to contain "2222")
+    $iproxyProcs = Get-CimInstance Win32_Process -Filter "Name='iproxy.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -match '\s2222\s+22\b' }
     if ($iproxyProcs) {
         foreach ($proc in $iproxyProcs) {
             try {
-                if (-not $Silent) { Write-Host "  🔥 Stopping iproxy (PID: $($proc.Id))" -ForegroundColor Red }
-                Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+                if (-not $Silent) { Write-Host "  🔥 Stopping iproxy SSH (PID: $($proc.ProcessId))" -ForegroundColor Red }
+                Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
                 $processesKilled++
             } catch { }
         }
@@ -1430,7 +1436,7 @@ function Start-MonibucaViaSshUsb {
         5. iPhone IP alias - Routes 127.10.10.10 to loopback
 
         iPhone app connects to rtmp://127.10.10.10:1935/live/srs which tunnels back to PC.
-        HTTP auth at http://127.10.10.10/I also tunnels back to Flask on PC.
+        HTTP auth at http://127.10.10.10/ also tunnels back to Flask on PC.
     #>
     try { Clear-Host } catch { Write-Host "Note: Could not clear console" -ForegroundColor Gray }
     Write-Host ""
@@ -1746,8 +1752,8 @@ function Start-MonibucaViaSshUsb {
 
     # Device name mappings (UDID -> friendly name)
     $deviceNames = @{
-        "00008030-001229C01146402E" = "iPhone 8"
-        "308e6361884208deb815e12efc230a028ddc4b1a" = "iPhone SE2"
+        "00008030-001229C01146402E" = "iPhone SE2"
+        "308e6361884208deb815e12efc230a028ddc4b1a" = "iPhone 8"
     }
 
     if ($udidLines.Count -gt 1) {
@@ -1905,9 +1911,21 @@ function Start-MonibucaViaSshUsb {
     # ============================================================================
     Write-Host "[STEP 6/9] 🚀 Starting iproxy (USB → SSH forwarding)..." -ForegroundColor Yellow
 
+    # CRITICAL: Validate UDID before starting (prevents silent failure)
+    if (-not $selectedUDID -or $selectedUDID.Trim() -eq '') {
+        Write-Host "  ❌ No device UDID selected! Cannot start iproxy." -ForegroundColor Red
+        Write-Host "     Ensure an iOS device is connected via USB and detected." -ForegroundColor Yellow
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP6: FAILED - No UDID selected"
+        $allReady = $false
+        Write-Host ""
+        Read-Host "Press Enter to return to menu..."
+        return
+    }
+
     # Run iproxy hidden - it just forwards ports, no user interaction needed
+    # CRITICAL: Use -u flag to bind to specific UDID (prevents wrong-device issues)
     $iproxyCommand = @"
-& "$iproxyPath" 2222 22 "$selectedUDID"
+& "$iproxyPath" -u "$selectedUDID" 2222 22
 "@
 
     Start-Process powershell -ArgumentList "-ExecutionPolicy", "Bypass", "-Command", $iproxyCommand -WindowStyle Hidden
@@ -2052,17 +2070,121 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
     # ============================================================================
     Write-Host "[STEP 9/9] 🔗 Starting SSH tunnels (ports 80 + 1935)..." -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "  This step creates reverse tunnels AND sets up iPhone IP alias." -ForegroundColor Gray
-    Write-Host "  ⚠️  FIRST TIME: Type 'y' to accept SSH host key when prompted!" -ForegroundColor Yellow
-    Write-Host ""
 
-    # Configure iPhone IP alias (GatewayPorts should already be enabled - see USB-STREAMING-WORKING.md)
-    Write-Host "  🔧 Setting up iPhone IP alias..." -ForegroundColor Gray
-    # Simple command without nested quotes to avoid escaping issues through plink→zsh
+    # Helper function: Probe for SSH fingerprint
+    # Uses -4 to force IPv4 (avoids ::1 connection refused noise)
+    function Get-SshFingerprint {
+        param([string]$PlinkExe, [string]$Password)
+        $out = (& $PlinkExe -4 -ssh -batch -T -P 2222 -pw $Password root@127.0.0.1 exit 2>&1) | Out-String
+        if ($out -match 'SHA256:[A-Za-z0-9+/=]+') {
+            return $Matches[0]
+        }
+        return $null
+    }
+
+    # Helper function: Run plink with fingerprint, retry once if host key changed
+    # Uses -4 and 127.0.0.1 to avoid IPv6 issues
+    function Invoke-PlinkWithRetry {
+        param(
+            [string]$PlinkExe,
+            [string]$Password,
+            [string]$Fingerprint,
+            [string]$Command
+        )
+        $plinkArgs = @('-4', '-ssh', '-batch', '-T', '-P', '2222', '-pw', $Password, 'root@127.0.0.1', $Command)
+        if ($Fingerprint) { $plinkArgs = @('-hostkey', $Fingerprint) + $plinkArgs }
+
+        $result = (& $PlinkExe $plinkArgs 2>&1) | Out-String
+
+        # If host key mismatch, re-probe and retry once
+        if ($result -match 'Host key not in manually configured list') {
+            $newFp = Get-SshFingerprint -PlinkExe $PlinkExe -Password $Password
+            if ($newFp) {
+                $plinkArgs = @('-hostkey', $newFp, '-4', '-ssh', '-batch', '-T', '-P', '2222', '-pw', $Password, 'root@127.0.0.1', $Command)
+                $result = (& $PlinkExe $plinkArgs 2>&1) | Out-String
+                return @{ Output = $result; Fingerprint = $newFp }
+            }
+        }
+        return @{ Output = $result; Fingerprint = $Fingerprint }
+    }
+
+    # STEP 9a: Get SSH host key fingerprint
+    Write-Host "  🔑 Probing iPhone SSH host key..." -ForegroundColor Gray
+
+    # Clear stale PuTTY cached keys
+    $hostKeyPath = 'HKCU:\Software\SimonTatham\PuTTY\SshHostKeys'
+    @('localhost', '127.0.0.1') | ForEach-Object { $h = $_
+        @('ssh-ed25519', 'ssh-rsa', 'ecdsa-sha2-nistp256') | ForEach-Object {
+            Remove-ItemProperty -Path $hostKeyPath -Name "$_@2222:$h" -ErrorAction SilentlyContinue
+        }
+    }
+
+    $hostKeyFp = Get-SshFingerprint -PlinkExe $plinkPath -Password $sshPassword
+    if ($hostKeyFp) {
+        Write-Host "  ✅ Host key fingerprint: $hostKeyFp" -ForegroundColor Green
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: HostKey=$hostKeyFp"
+    } else {
+        Write-Host "  ⚠️ Could not determine host key fingerprint" -ForegroundColor Yellow
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: No fingerprint found"
+    }
+
+    # STEP 9b: Verify/Fix sshd GatewayPorts configuration (critical after reboot!)
+    Write-Host "  🔧 Checking iPhone sshd configuration..." -ForegroundColor Gray
+
+    $sshdCheckCmd = 'sshd -T 2>/dev/null | grep -E "^gatewayports|^allowtcpforwarding"'
+    $sshdResult = Invoke-PlinkWithRetry -PlinkExe $plinkPath -Password $sshPassword -Fingerprint $hostKeyFp -Command $sshdCheckCmd
+    $hostKeyFp = $sshdResult.Fingerprint  # Update if it changed
+
+    $needsSshdFix = $false
+    if ($sshdResult.Output -notmatch 'gatewayports clientspecified') {
+        $needsSshdFix = $true
+        Write-Host "  ⚠️ GatewayPorts not configured - fixing..." -ForegroundColor Yellow
+    }
+    if ($sshdResult.Output -notmatch 'allowtcpforwarding yes') {
+        $needsSshdFix = $true
+        Write-Host "  ⚠️ AllowTcpForwarding not enabled - fixing..." -ForegroundColor Yellow
+    }
+
+    if ($needsSshdFix) {
+        # Apply sshd config fixes
+        $fixCmd = 'grep -q "^GatewayPorts clientspecified" /etc/ssh/sshd_config || echo "GatewayPorts clientspecified" >> /etc/ssh/sshd_config; grep -q "^AllowTcpForwarding yes" /etc/ssh/sshd_config || echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config; launchctl unload /Library/LaunchDaemons/com.openssh.sshd.plist 2>/dev/null; launchctl load /Library/LaunchDaemons/com.openssh.sshd.plist 2>/dev/null; echo SSHD_FIXED'
+        $fixResult = Invoke-PlinkWithRetry -PlinkExe $plinkPath -Password $sshPassword -Fingerprint $hostKeyFp -Command $fixCmd
+
+        if ($fixResult.Output -match 'SSHD_FIXED') {
+            Write-Host "  ✅ sshd configuration fixed and restarted" -ForegroundColor Green
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: sshd config fixed"
+
+            # CRITICAL: sshd restart may change host key - re-probe!
+            Start-Sleep -Seconds 1
+            $newFp = Get-SshFingerprint -PlinkExe $plinkPath -Password $sshPassword
+            if ($newFp -and $newFp -ne $hostKeyFp) {
+                Write-Host "  🔑 Host key changed after sshd restart: $newFp" -ForegroundColor Cyan
+                $hostKeyFp = $newFp
+                Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: NewHostKey=$hostKeyFp"
+            }
+        } else {
+            Write-Host "  ⚠️ Could not fix sshd config automatically" -ForegroundColor Yellow
+            Write-Host "     See: docs/Post-Reboot-Checklist.md for manual fix" -ForegroundColor Gray
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: sshd fix failed: $($fixResult.Output)"
+        }
+    } else {
+        Write-Host "  ✅ sshd configuration OK" -ForegroundColor Green
+    }
+
+    # STEP 9c: Configure iPhone IP alias using the fingerprint
+    # Uses -4 and 127.0.0.1 to force IPv4
+    Write-Host "  🔧 Setting up iPhone IP alias (127.10.10.10)..." -ForegroundColor Gray
     $aliasCmd = 'ifconfig lo0 alias 127.10.10.10 netmask 255.255.255.255; echo ALIAS_OK'
-    $aliasResult = & $plinkPath -ssh -batch -pw $sshPassword root@localhost -P 2222 $aliasCmd 2>&1
+
+    # Build alias command args with hostkey if we have it
+    $aliasArgs = @('-4', '-ssh', '-batch', '-T', '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1', $aliasCmd)
+    if ($hostKeyFp) {
+        $aliasArgs = @('-hostkey', $hostKeyFp) + $aliasArgs
+    }
+
+    $aliasResult = (& "$plinkPath" $aliasArgs 2>&1) | Out-String
     if ($aliasResult -match 'ALIAS_OK') {
-        Write-Host "  ✅ iPhone IP alias configured (127.10.10.10)" -ForegroundColor Green
+        Write-Host "  ✅ iPhone IP alias configured" -ForegroundColor Green
         Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] iPhone alias OK"
     } else {
         Write-Host "  ⚠️ iPhone alias may have issues (continuing anyway)" -ForegroundColor Yellow
@@ -2070,43 +2192,260 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
         Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] iPhone alias warning: $aliasResult"
     }
 
-    # Start SSH tunnel with -batch mode and a keep-alive command (tunnel dies without a command!)
-    Write-Host "  🔗 Starting SSH reverse tunnel..." -ForegroundColor Gray
+    # STEP 9d: Apply jetsam protection to TrollVNC and sshd (prevents camera app conflicts)
+    # This protects VNC and SSH tunnel from being killed when 3rd party camera apps start
+    # CRITICAL: Plist modification alone is NOT reliable - modern jailbreaks ignore those keys
+    # We MUST use jetsamctl for RUNTIME protection which directly sets kernel jetsam priority
+    Write-Host "  🛡️ Applying jetsam protection for VNC/sshd..." -ForegroundColor Gray
 
-    # CRITICAL: plink MUST use -batch AND have a running command or the tunnel won't bind ports!
-    # Using 'cat' as keep-alive - it waits forever for input that never comes
-    # -batch auto-accepts host keys so it works with different phones without user interaction
-    $tunnelCommand = @"
-& "$plinkPath" -ssh -batch -R 127.10.10.10:80:localhost:80 -R 127.10.10.10:1935:localhost:1935 -pw $sshPassword root@localhost -P 2222 'echo TUNNEL_ACTIVE; cat'
-"@
-    Start-Process powershell -ArgumentList "-ExecutionPolicy", "Bypass", "-Command", $tunnelCommand -WindowStyle Hidden
+    # Build base plink args
+    $plinkBaseArgs = @('-4', '-ssh', '-batch', '-T', '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1')
+    if ($hostKeyFp) { $plinkBaseArgs = @('-hostkey', $hostKeyFp) + $plinkBaseArgs }
 
-    # Give SSH time to connect and set up tunnels
-    Write-Host "  ⏳ Waiting for SSH connection..." -ForegroundColor Gray
-    Start-Sleep -Seconds 5
+    # PHASE 1: Plist modification (backup approach - may be ignored by iOS)
+    # Check and add keys to plist if missing (one-time setup)
+    $vncCheckCmd = 'grep -c JetsamMemoryLimit /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null || echo 0'
+    $vncCheckArgs = $plinkBaseArgs + @($vncCheckCmd)
+    $vncJetsamCount = (& "$plinkPath" $vncCheckArgs 2>&1) | Out-String
 
-    # Verify plink process started AND stays alive
-    $plinkProcs = Get-Process -Name "plink" -ErrorAction SilentlyContinue
-    if ($plinkProcs) {
-        Write-Host "  ✅ SSH tunnel process started (PID: $($plinkProcs.Id -join ', '))" -ForegroundColor Green
+    if ($vncJetsamCount -match '^0') {
+        Write-Host "  🔧 Adding jetsam keys to TrollVNC plist (one-time)..." -ForegroundColor Cyan
+        $vncFixCmd = @'
+perl -i -0777 -pe 'if (!s|(<key>EnablePressuredExit</key>)|<key>JetsamMemoryLimit</key>\n\t<integer>-1</integer>\n\t<key>JetsamPriority</key>\n\t<integer>18</integer>\n\t$1|s) { s|(</dict>\s*</plist>)|<key>JetsamMemoryLimit</key>\n\t<integer>-1</integer>\n\t<key>JetsamPriority</key>\n\t<integer>18</integer>\n$1|s }' /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null && launchctl unload /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null; launchctl load /var/jb/Library/LaunchDaemons/com.82flex.trollvnc.plist 2>/dev/null && echo PLIST_VNC_OK
+'@
+        $vncFixArgs = $plinkBaseArgs + @($vncFixCmd)
+        $null = (& "$plinkPath" $vncFixArgs 2>&1)
+    }
 
-        # Brief liveness check - plink can die immediately if auth fails or host key issues
-        Start-Sleep -Seconds 2
-        $plinkStillAlive = Get-Process -Name "plink" -ErrorAction SilentlyContinue
-        if ($plinkStillAlive) {
-            Write-Host "  ✅ SSH tunnel confirmed stable" -ForegroundColor Green
-            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel OK - plink alive after liveness check"
+    $sshdCheckCmd = 'grep -c JetsamMemoryLimit /var/jb/Library/LaunchDaemons/com.openssh.sshd.plist 2>/dev/null || echo 0'
+    $sshdCheckArgs = $plinkBaseArgs + @($sshdCheckCmd)
+    $sshdJetsamCount = (& "$plinkPath" $sshdCheckArgs 2>&1) | Out-String
+
+    if ($sshdJetsamCount -match '^0') {
+        Write-Host "  🔧 Adding jetsam keys to sshd plist (one-time)..." -ForegroundColor Cyan
+        # NOTE: Unlike TrollVNC, we do NOT reload sshd after modifying the plist because:
+        # 1. We are currently using sshd for this SSH connection - reloading would kill our session
+        # 2. Plist-based jetsam keys are ignored by rootless jailbreaks anyway
+        # 3. The REAL fix is jetsamctl runtime protection applied below
+        $sshdFixCmd = @'
+perl -i -0777 -pe 's|(</dict>\s*</plist>)|<key>JetsamMemoryLimit</key>\n\t<integer>-1</integer>\n\t<key>JetsamPriority</key>\n\t<integer>18</integer>\n\t<key>EnablePressuredExit</key>\n\t<false/>\n$1|s' /var/jb/Library/LaunchDaemons/com.openssh.sshd.plist 2>/dev/null && echo PLIST_SSHD_OK
+'@
+        $sshdFixArgs = $plinkBaseArgs + @($sshdFixCmd)
+        $null = (& "$plinkPath" $sshdFixArgs 2>&1)
+    }
+
+    # PHASE 2: Runtime jetsamctl protection (THE ACTUAL FIX - runs every session)
+    # This directly sets jetsam priority in the kernel, bypassing plist limitations
+    Write-Host "  🛡️ Applying RUNTIME jetsam protection via jetsamctl..." -ForegroundColor Cyan
+
+    # Check if jetsamctl is available
+    $jetsamCheckCmd = 'which jetsamctl 2>/dev/null && echo JETSAMCTL_FOUND || echo JETSAMCTL_MISSING'
+    $jetsamCheckArgs = $plinkBaseArgs + @($jetsamCheckCmd)
+    $jetsamCheckResult = (& "$plinkPath" $jetsamCheckArgs 2>&1) | Out-String
+
+    if ($jetsamCheckResult -match 'JETSAMCTL_MISSING') {
+        Write-Host "  🔧 jetsamctl not found - compiling from source..." -ForegroundColor Cyan
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] jetsamctl missing - attempting to compile"
+
+        # Compile jetsamctl from source (since it's not in repos)
+        $compileCmd = @'
+cat > /tmp/jetsamctl.c << 'EOFC'
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/sysctl.h>
+#define MEMORYSTATUS_CMD_SET_PRIORITY_PROPERTIES 7
+extern int memorystatus_control(uint32_t command, int32_t pid, uint32_t flags, void *buffer, size_t buffersize);
+typedef struct memorystatus_priority_properties { int32_t priority; uint64_t user_data; } memorystatus_priority_properties_t;
+int main(int argc, char *argv[]) {
+    if (argc < 3) { printf("Usage: jetsamctl -p <priority> <pid>\n"); return 1; }
+    int opt; long priority = -1; char *pend;
+    while ((opt = getopt(argc, argv, "p:l:")) != -1) {
+        if (opt == 'p') { errno = 0; priority = strtol(optarg, &pend, 10);
+            if (errno || *pend || priority < 0 || priority > 100) { fprintf(stderr, "Invalid priority\n"); return 1; } } }
+    if (optind >= argc) { fprintf(stderr, "Expected PID\n"); return 1; }
+    char *endptr; errno = 0;
+    long lpid = strtol(argv[optind], &endptr, 10);
+    if (errno || *endptr || lpid <= 0 || lpid > 99999) { fprintf(stderr, "Invalid PID\n"); return 1; }
+    pid_t pid = (pid_t)lpid;
+    if (priority >= 0) {
+        memorystatus_priority_properties_t props = { .priority = priority, .user_data = 0 };
+        if (memorystatus_control(MEMORYSTATUS_CMD_SET_PRIORITY_PROPERTIES, pid, 0, &props, sizeof(props)) != 0) {
+            fprintf(stderr, "Failed: %s\n", strerror(errno)); return 1;
+        }
+        printf("Set priority %d for PID %d\n", priority, pid);
+    }
+    return 0;
+}
+EOFC
+cd /tmp && clang -o jetsamctl jetsamctl.c 2>&1 && ldid -S jetsamctl && cp jetsamctl /var/jb/usr/bin/ && chmod +x /var/jb/usr/bin/jetsamctl && which jetsamctl && echo COMPILE_OK
+'@
+        $compileArgs = $plinkBaseArgs + @($compileCmd)
+        $compileResult = (& "$plinkPath" $compileArgs 2>&1) | Out-String
+
+        if ($compileResult -match 'COMPILE_OK') {
+            Write-Host "  ✅ jetsamctl compiled and installed" -ForegroundColor Green
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] jetsamctl compiled successfully"
         } else {
-            Write-Host "  ⚠️ SSH tunnel died shortly after starting!" -ForegroundColor Yellow
-            Write-Host "     Check: iPhone connected? SSH password correct? Host key accepted?" -ForegroundColor Gray
-            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel DIED - plink exited after startup"
+            Write-Host "  ❌ Failed to compile jetsamctl (clang/ldid may be missing)" -ForegroundColor Red
+            Write-Host "     VNC may crash when camera apps open" -ForegroundColor Yellow
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] jetsamctl compile FAILED: $compileResult"
+        }
+    }
+
+    # Apply runtime protection to TrollVNC and sshd (if jetsamctl exists now)
+    # Use launchctl to find PIDs (pgrep not available on all jailbreaks)
+    # Priority 18 = critical system daemon level (higher = less likely to be killed)
+    Write-Host "  🛡️ Applying runtime jetsam protection..." -ForegroundColor Cyan
+    $jetsamApplyCmd = @'
+VNC_PID=$(launchctl list 2>/dev/null | grep -iE 'trollvnc|82flex' | awk '$1 ~ /^[0-9]+$/ {print $1; exit}')
+SSHD_PID=$(launchctl list 2>/dev/null | grep 'com.openssh.sshd' | awk '$1 ~ /^[0-9]+$/ {print $1; exit}')
+VNC_OK=0; SSHD_OK=0
+if [ -n "$VNC_PID" ]; then /var/jb/usr/bin/jetsamctl -p 18 $VNC_PID 2>/dev/null && VNC_OK=1; fi
+if [ -n "$SSHD_PID" ]; then /var/jb/usr/bin/jetsamctl -p 18 $SSHD_PID 2>/dev/null && SSHD_OK=1; fi
+echo "VNC_PID=$VNC_PID VNC_OK=$VNC_OK SSHD_PID=$SSHD_PID SSHD_OK=$SSHD_OK"
+'@
+    $jetsamApplyArgs = $plinkBaseArgs + @($jetsamApplyCmd)
+    $jetsamResult = (& "$plinkPath" $jetsamApplyArgs 2>&1) | Out-String
+
+    if ($jetsamResult -match 'VNC_OK=1') {
+        Write-Host "  ✅ TrollVNC jetsam protection applied (runtime)" -ForegroundColor Green
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] TrollVNC jetsamctl protection applied"
+    } else {
+        Write-Host "  ⚠️ TrollVNC jetsamctl failed (process not found or jetsamctl error)" -ForegroundColor Yellow
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] TrollVNC jetsamctl warning: $jetsamResult"
+    }
+
+    if ($jetsamResult -match 'SSHD_OK=1') {
+        Write-Host "  ✅ sshd jetsam protection applied (runtime)" -ForegroundColor Green
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] sshd jetsamctl protection applied"
+    } else {
+        Write-Host "  ⚠️ sshd jetsamctl failed (process not found or jetsamctl error)" -ForegroundColor Yellow
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] sshd jetsamctl warning: $jetsamResult"
+    }
+
+    # STEP 9e: Verify tunnel will work BEFORE starting (verbose probe)
+    # Uses -4 and 127.0.0.1 to avoid IPv6 "Connection refused" false positives
+    # CRITICAL: Use DIFFERENT test ports (18080/11935) to avoid race condition with real tunnel
+    Write-Host "  🔍 Verifying tunnel acceptance..." -ForegroundColor Gray
+
+    $verifyArgs = @('-4', '-v', '-ssh', '-batch', '-T',
+        '-R', '127.10.10.10:18080:127.0.0.1:80',
+        '-R', '127.10.10.10:11935:127.0.0.1:1935',
+        '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1', 'echo PROBE; exit')
+    if ($hostKeyFp) { $verifyArgs = @('-hostkey', $hostKeyFp) + $verifyArgs }
+
+    $verifyOut = (& "$plinkPath" $verifyArgs 2>&1) | Out-String
+
+    # Check for REMOTE PORT FORWARDING refused (not generic "Connection refused")
+    # The tight match avoids false positives from IPv6 connection attempts
+    if ($verifyOut -match 'Remote port forwarding from .* (refused|prohibited)|administratively prohibited|cannot listen') {
+        Write-Host "  ❌ Tunnel REFUSED by iPhone sshd!" -ForegroundColor Red
+        Write-Host "     GatewayPorts/AllowTcpForwarding not configured properly" -ForegroundColor Yellow
+        Write-Host "     See: docs/Post-Reboot-Checklist.md" -ForegroundColor Gray
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: Tunnel REFUSED - sshd config issue"
+        $allReady = $false
+    } elseif ($verifyOut -match 'Remote port forwarding from .* enabled') {
+        Write-Host "  ✅ Tunnel ports accepted by sshd" -ForegroundColor Green
+        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: Tunnel ports accepted"
+    } elseif ($verifyOut -match 'Host key not in manually configured list') {
+        # Host key changed again - re-probe and retry
+        Write-Host "  🔑 Host key changed, re-probing..." -ForegroundColor Cyan
+        $hostKeyFp = Get-SshFingerprint -PlinkExe $plinkPath -Password $sshPassword
+        if ($hostKeyFp) {
+            $verifyArgs = @('-hostkey', $hostKeyFp, '-4', '-v', '-ssh', '-batch', '-T',
+                '-R', '127.10.10.10:18080:127.0.0.1:80', '-R', '127.10.10.10:11935:127.0.0.1:1935',
+                '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1', 'echo PROBE; exit')
+            $verifyOut = (& "$plinkPath" $verifyArgs 2>&1) | Out-String
+            if ($verifyOut -match 'Remote port forwarding from .* enabled') {
+                Write-Host "  ✅ Tunnel ports accepted (after key refresh)" -ForegroundColor Green
+            } elseif ($verifyOut -match 'Remote port forwarding from .* refused') {
+                Write-Host "  ❌ Tunnel still REFUSED after key refresh" -ForegroundColor Red
+                $allReady = $false
+            }
+        }
+    }
+
+    # STEP 9f: Start the actual tunnel (keep-alive with sleep)
+    # Uses -4 and 127.0.0.1 to force IPv4
+    if ($allReady) {
+        Write-Host "  🔗 Starting SSH reverse tunnel..." -ForegroundColor Gray
+
+        # Create plink log for debugging if it dies (use same dir as UsbLogFile)
+        $plinkLogFile = $null
+        try {
+            $plinkLogDir = if ($script:UsbLogFile) { Split-Path -Parent $script:UsbLogFile } else { $null }
+            if (-not $plinkLogDir -or -not (Test-Path $plinkLogDir -IsValid)) {
+                $plinkLogDir = Join-Path $script:SRSHome "logs"
+            }
+            if (-not (Test-Path $plinkLogDir)) {
+                New-Item -ItemType Directory -Path $plinkLogDir -Force -ErrorAction Stop | Out-Null
+            }
+            $plinkLogFile = Join-Path $plinkLogDir ("plink-tunnel-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss") + ".log")
+        } catch {
+            Write-Host "  ⚠️ Could not create plink log directory, continuing without SSH logging" -ForegroundColor Yellow
+            $plinkLogFile = $null
+        }
+
+        $tunnelArgs = @(
+            '-4', '-ssh', '-batch', '-T',
+            '-R', '127.10.10.10:80:127.0.0.1:80',
+            '-R', '127.10.10.10:1935:127.0.0.1:1935',
+            '-P', '2222', '-pw', "$sshPassword", 'root@127.0.0.1',
+            'sleep 31536000'  # 1 year - no quotes/shell escaping needed
+        )
+        if ($plinkLogFile) { $tunnelArgs = @('-sshlog', $plinkLogFile) + $tunnelArgs }
+        if ($hostKeyFp) { $tunnelArgs = @('-hostkey', $hostKeyFp) + $tunnelArgs }
+
+        Start-Process -WindowStyle Hidden -FilePath "$plinkPath" -ArgumentList $tunnelArgs
+
+        # Give SSH time to connect
+        Start-Sleep -Seconds 2
+
+        # Verify plink process stays alive
+        $plinkProcs = Get-Process -Name "plink" -ErrorAction SilentlyContinue
+        if ($plinkProcs) {
+            Start-Sleep -Seconds 2
+            $plinkStillAlive = Get-Process -Name "plink" -ErrorAction SilentlyContinue
+            if ($plinkStillAlive) {
+                Write-Host "  ✅ SSH tunnel running (PID: $($plinkStillAlive.Id -join ', '))" -ForegroundColor Green
+                Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel OK - plink stable"
+
+                # CRITICAL: Verify tunnels are actually bound on iPhone (not just plink alive)
+                Write-Host "  🔍 Verifying tunnel ports bound on iPhone..." -ForegroundColor Gray
+                $checkListeners = 'netstat -an | grep -E "127\.10\.10\.10\.(80|1935).*LISTEN" || echo NO_LISTENERS'
+                $listenerArgs = @('-4', '-ssh', '-batch', '-T', '-P', '2222', '-pw', $sshPassword, 'root@127.0.0.1', $checkListeners)
+                if ($hostKeyFp) { $listenerArgs = @('-hostkey', $hostKeyFp) + $listenerArgs }
+                $listenerCheck = (& $plinkPath $listenerArgs 2>&1) | Out-String
+
+                if ($listenerCheck -match 'NO_LISTENERS') {
+                    Write-Host "  ❌ Tunnel NOT listening on iPhone - ports not bound!" -ForegroundColor Red
+                    Write-Host "     Likely cause: iproxy on wrong device or sshd config issue" -ForegroundColor Yellow
+                    Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: TUNNEL NOT BOUND - listeners not found on 127.10.10.10"
+                    $allReady = $false
+                    # Cleanup stale processes to avoid confusing state
+                    Write-Host "  🧹 Cleaning up failed tunnel processes..." -ForegroundColor Gray
+                    Stop-UsbStreamingProcesses -Silent
+                } elseif ($listenerCheck -match '127\.10\.10\.10\.(80|1935)') {
+                    Write-Host "  ✅ Tunnel ports verified on iPhone (80 + 1935)" -ForegroundColor Green
+                    Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: Tunnel ports VERIFIED listening on iPhone"
+                } else {
+                    Write-Host "  ⚠️ Could not verify tunnel listeners (check manually)" -ForegroundColor Yellow
+                    Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: Listener check inconclusive: $listenerCheck"
+                }
+            } else {
+                Write-Host "  ⚠️ SSH tunnel died shortly after starting!" -ForegroundColor Yellow
+                Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel DIED"
+                $allReady = $false
+            }
+        } else {
+            Write-Host "  ⚠️ SSH tunnel failed to start" -ForegroundColor Yellow
+            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel FAILED - no process"
             $allReady = $false
         }
-    } else {
-        Write-Host "  ⚠️ SSH tunnel failed to start" -ForegroundColor Yellow
-        Write-Host "     Check: plink.exe exists? iproxy running? iPhone connected?" -ForegroundColor Gray
-        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel FAILED - plink process NOT FOUND"
-        $allReady = $false
     }
     Write-Host ""
 
@@ -2346,10 +2685,10 @@ function Start-iPhoneUltraSmooth {
     Write-Host "[INFO] Launching iPhone Ultra-Smooth Dynamic mode" -ForegroundColor Cyan
     Write-Host ""
 
-    Write-Host "`[STEP 1/4] 🧹 Cleaning up conflicting processes..." -ForegroundColor Yellow
+    Write-Host "[STEP 1/4] 🧹 Cleaning up conflicting processes..." -ForegroundColor Yellow
     Clear-SRSPorts
 
-    Write-Host "`[STEP 2/4] ⚙️  Using ultra-smooth dynamic configuration..." -ForegroundColor Yellow
+    Write-Host "[STEP 2/4] ⚙️  Using ultra-smooth dynamic configuration..." -ForegroundColor Yellow
     $configPath = Join-Path $script:SRSHome "config\active\srs_iphone_ultra_smooth_dynamic.conf"
 
     # Check if config exists, fallback to regular ultra smooth
@@ -2358,14 +2697,14 @@ function Start-iPhoneUltraSmooth {
         Write-Host "  Using fallback config: $configPath" -ForegroundColor Yellow
     }
 
-    Write-Host "`[STEP 3/4] 🔧 Auto-updating IP addresses..." -ForegroundColor Yellow
+    Write-Host "[STEP 3/4] 🔧 Auto-updating IP addresses..." -ForegroundColor Yellow
     if (Update-ConfigIP $configPath) {
         Write-Host "  ✅ IP configuration updated to: $script:CurrentIP" -ForegroundColor Green
     } else {
         Write-Host "  ⚠️ Using existing IP configuration" -ForegroundColor Yellow
     }
 
-    Write-Host "`[STEP 4/4] 🚀 Starting SRS server..." -ForegroundColor Yellow
+    Write-Host "[STEP 4/4] 🚀 Starting SRS server..." -ForegroundColor Yellow
     Write-Host ""
     Write-Host "    -------------------------------------------------------------------------------------" -ForegroundColor Green
     Write-Host "  📱 RTMP URL: rtmp://$script:CurrentIP`:1935/live/srs" -ForegroundColor Green
@@ -3607,7 +3946,7 @@ function Test-ConfigWithIPFix($configInfo) {
     Write-Host ""
 
     # Check if config has correct IP
-    Write-Host "`[STEP 1/4] 🔍 Checking IP configuration..." -ForegroundColor Yellow
+    Write-Host "[STEP 1/4] 🔍 Checking IP configuration..." -ForegroundColor Yellow
     $configNeedsUpdate = Test-ConfigIPUpdate $configInfo.FullPath
 
     if ($configNeedsUpdate) {
@@ -3624,13 +3963,13 @@ function Test-ConfigWithIPFix($configInfo) {
     }
 
     Write-Host ""
-    Write-Host "`[STEP 2/4] 🧹 Cleaning up ports..." -ForegroundColor Yellow
+    Write-Host "[STEP 2/4] 🧹 Cleaning up ports..." -ForegroundColor Yellow
     Clear-SRSPorts
 
-    Write-Host "`[STEP 3/4] 📋 Configuration summary..." -ForegroundColor Yellow
+    Write-Host "[STEP 3/4] 📋 Configuration summary..." -ForegroundColor Yellow
     Show-ConfigSummary $configInfo.FullPath
 
-    Write-Host "`[STEP 4/4] 🚀 Starting SRS server..." -ForegroundColor Yellow
+    Write-Host "[STEP 4/4] 🚀 Starting SRS server..." -ForegroundColor Yellow
     Write-Host ""
 
     Start-SRSServer $configInfo.FullPath
@@ -3889,7 +4228,7 @@ function Show-ConfigurationSettings {
 
 # Main execution
 try {
-    Write-Log "=== SRS Launcher Started ==="
+    Write-Log "=== iOS-VCAM Launcher Started ==="
     Write-Log "PowerShell Version: $($PSVersionTable.PSVersion)"
     Write-Log "Operating System: $([System.Environment]::OSVersion.VersionString)"
 
@@ -3913,11 +4252,11 @@ try {
         Write-Host "    " -NoNewline
         Write-Host "╔═══════════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Green
         Write-Host "    " -NoNewline
-        Write-Host "║                               🎉 WELCOME TO SRS LAUNCHER!                             ║" -BackgroundColor DarkGreen -ForegroundColor White
+        Write-Host "║                            🎉 WELCOME TO iOS-VCAM LAUNCHER!                            ║" -BackgroundColor DarkGreen -ForegroundColor White
         Write-Host "    " -NoNewline
         Write-Host "╚═══════════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Green
         Write-Host ""
-        Write-Host "  🎯 This appears to be your first time running SRS Launcher!" -ForegroundColor Cyan
+        Write-Host "  🎯 This appears to be your first time running iOS-VCAM Launcher!" -ForegroundColor Cyan
         Write-Host "  📡 Let's configure your preferred network adapter for optimal streaming." -ForegroundColor White
         Write-Host ""
         Write-Host "  💡 You can change these settings anytime from the Configuration menu." -ForegroundColor Yellow
@@ -3946,7 +4285,7 @@ try {
             Write-Host "  📡 Selected: $($selectedAdapter.Name)" -ForegroundColor Cyan
             Write-Host "  🌐 IP Address: $($selectedAdapter.IP)" -ForegroundColor Cyan
             Write-Host ""
-            Write-Host "  🚀 SRS Launcher is now ready to use!" -ForegroundColor White
+            Write-Host "  🚀 iOS-VCAM Launcher is now ready to use!" -ForegroundColor White
             Write-Host ""
             Read-Host "Press Enter to continue to main menu"
         } else {
@@ -3960,7 +4299,7 @@ try {
 
     do {
         Show-MainMenu
-        $choice = Read-Host "Choose option [A, B, 1, 3-9, U, C, Q]"
+        $choice = Read-Host "Choose option [U, A, B, 1, 3-9, C, Q]"
 
         if ([string]::IsNullOrEmpty($choice)) {
             $choice = "Q"
@@ -3987,7 +4326,7 @@ try {
                 "Q" {
                     Write-Host ""
                     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
-                    Write-Host "                     🎉 Thank you for using SRS Ultimate Launcher!                      " -BackgroundColor DarkGreen -ForegroundColor White
+                    Write-Host "                       🎉 Thank you for using iOS-VCAM Launcher!                        " -BackgroundColor DarkGreen -ForegroundColor White
                     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
                     Write-Host ""
                     exit 0
@@ -4019,7 +4358,7 @@ try {
     Write-Host "    ║                                ❌ CRITICAL ERROR                                       ║" -BackgroundColor DarkRed -ForegroundColor White
     Write-Host "    ╚═══════════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Red
     Write-Host ""
-    Write-Host "  🚨 An unexpected error occurred in the SRS Launcher:" -ForegroundColor Red
+    Write-Host "  🚨 An unexpected error occurred in the iOS-VCAM Launcher:" -ForegroundColor Red
     Write-Host ""
     Write-Host "  📝 Error Details:" -ForegroundColor Yellow
     Write-Host "     $($_.Exception.Message)" -ForegroundColor White

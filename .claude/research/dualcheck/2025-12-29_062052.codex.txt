@@ -1,0 +1,103 @@
+Reading prompt from stdin...
+OpenAI Codex v0.77.0 (research preview)
+--------
+workdir: F:\claude\iOS-Vcam-server\iOS-VCAM-v4.2-Distribution
+model: gpt-5.2-codex
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: auto
+session id: 019b6a7d-a88f-74e0-9b15-3789543c3076
+--------
+user
+You are reviewing a set of changes to a PowerShell launcher script for iOS streaming software.
+
+Analyze for: (1) logic correctness & edge cases, (2) error handling completeness, (3) type/null-safety, (4) architectural consistency, (5) test gaps, (6) concurrency/races, (7) resource cleanup.
+
+OUTPUT REQUIREMENTS:
+1) Start with a JSON array in a single fenced block (```json). Each item: {severity: 'CRITICAL|HIGH|MEDIUM|LOW', title, details, file, line, recommendation}.
+2) Then provide a short human summary.
+
+INPUT (diff/excerpts):
+
+diff --git a/iOS-VCAM-Launcher.ps1 b/iOS-VCAM-Launcher.ps1
+index a8c3cc4..150736a 100644
+--- a/iOS-VCAM-Launcher.ps1
++++ b/iOS-VCAM-Launcher.ps1
+@@ -699,10 +699,15 @@ function Show-MainMenu {
+         Write-Host "      • Directly launches SRS (same as [A] when SRS is active)" -ForegroundColor Gray
+         Write-Host "      • Tip: Use [A] for normal streaming" -ForegroundColor DarkGray
+     }
+     Write-Host ""
+ 
++    Write-Host "  [U] 🔌 USB STREAMING (SSH Tunnel)" -ForegroundColor Magenta
++    Write-Host "      • Streams over USB without WiFi" -ForegroundColor Gray
++    Write-Host "      • Requires OpenSSH on iPhone" -ForegroundColor Gray
++    Write-Host ""
++
+     Write-Host "  [1] 🔐 FLASK AUTHENTICATION SERVER (Standalone)" -ForegroundColor White
+     Write-Host "      • Handles iOS app authentication/validation" -ForegroundColor Gray
+     Write-Host "      • Auto-installs Flask if needed" -ForegroundColor Gray
+     Write-Host "      • Uses detected IP: $script:CurrentIP" -ForegroundColor Gray
+     Write-Host ""
+@@ -727,14 +732,10 @@ function Show-MainMenu {
+     Write-Host "  [6] 🔄 REFRESH NETWORK DETECTION" -ForegroundColor White
+     Write-Host "  [7] 📋 COPY RTMP URL TO CLIPBOARD" -ForegroundColor White
+     Write-Host "  [8] 📱 CREATE iOS .DEB WITH CUSTOM IP" -ForegroundColor White
+     Write-Host "  [9] 🧪 USB SETUP VALIDATION" -ForegroundColor White
+     Write-Host ""
+-    Write-Host "  [U] 🔌 USB STREAMING (SSH Tunnel)" -ForegroundColor Magenta
+-    Write-Host "      • Streams over USB without WiFi" -ForegroundColor Gray
+-    Write-Host "      • Requires OpenSSH on iPhone" -ForegroundColor Gray
+-    Write-Host ""
+     Write-Host "  [C] ⚙️  CONFIGURATION SETTINGS" -ForegroundColor White
+     Write-Host "  [Q] 🚪 QUIT" -ForegroundColor White
+     Write-Host ""
+     Write-Host "    " -NoNewline
+     Write-Host "╚═══════════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor DarkGray
+@@ -3958,11 +3959,11 @@ try {
+ 
+     Get-NetworkInfo
+ 
+     do {
+         Show-MainMenu
+-        $choice = Read-Host "Choose option [A, B, 1, 3-9, U, C, Q]"
++        $choice = Read-Host "Choose option [A, B, U, 1, 3-9, C, Q]"
+ 
+         if ([string]::IsNullOrEmpty($choice)) {
+             $choice = "Q"
+         }
+ 
+
+mcp: exa starting
+mcp: subagents starting
+mcp: github starting
+mcp: chromedevtools starting
+mcp: desktop-commander starting
+mcp: sequential-thinking starting
+mcp: serena starting
+mcp: exa ready
+mcp: github ready
+mcp: sequential-thinking ready
+mcp: chromedevtools ready
+mcp: subagents ready
+mcp: desktop-commander ready
+mcp: serena ready
+mcp startup: ready: exa, github, sequential-thinking, chromedevtools, subagents, desktop-commander, serena
+
+thinking
+**Reviewing code changes for issues**
+codex
+```json
+[]
+```
+
+No issues found in the provided diff. The changes only reorder the USB streaming menu entry and adjust the prompt text ordering, with no impact on logic, error handling, or resource behavior. If there are other related edits outside this excerpt (e.g., input handling for `U`), share those for a fuller review.
+tokens used
+23,426
+```json
+[]
+```
+
+No issues found in the provided diff. The changes only reorder the USB streaming menu entry and adjust the prompt text ordering, with no impact on logic, error handling, or resource behavior. If there are other related edits outside this excerpt (e.g., input handling for `U`), share those for a fuller review.

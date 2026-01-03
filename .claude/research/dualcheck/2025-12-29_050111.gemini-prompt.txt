@@ -1,0 +1,325 @@
+You are debugging a Windows batch script issue.
+
+PROBLEM: When the user selects option [1] to launch BOTH iPhones via USB, the script opens 4 VNC viewer windows instead of 2. The connect_vnc function is only called twice (lines 197-198), but somehow 4 windows open.
+
+The script is a TrollVNC launcher that:
+1. Starts iproxy to forward VNC ports over USB
+2. Waits for ports to be ready
+3. Launches RealVNC viewer for each phone
+
+ANALYZE:
+1. Why might the script be opening 4 windows instead of 2?
+2. Is there any way the connect_vnc function or the VNC start command could spawn multiple windows?
+3. Check for batch file control flow issues (goto, call, labels)
+4. Check if the menu could be re-entered or the :both_usb block could execute twice
+
+OUTPUT REQUIREMENTS:
+1) Start with a JSON array in a single fenced block (```json). Each item: {severity: 'CRITICAL|HIGH|MEDIUM|LOW', title, details, file, line, recommendation}.
+2) Then provide a short human summary with the ROOT CAUSE.
+
+BATCH FILE CONTENT:
+
+@echo off
+setlocal enabledelayedexpansion
+cd /d %~dp0
+
+REM ==========================================================
+REM  TrollVNC Manager v2.0 - Dual USB Support
+REM ==========================================================
+REM  Supports controlling TWO iPhones via USB simultaneously
+REM  iPhone 8  -> localhost:5901
+REM  iPhone SE2 -> localhost:5902
+REM ==========================================================
+
+set "CONFIG_FILE=device_config.ini"
+
+REM ==========================================================
+REM  DEFAULTS (overridden by config file if present)
+REM ==========================================================
+
+REM iPhone 8 defaults
+set "IP8=192.168.50.115"
+set "UDID8=00008030-001229C01146402E"
+
+REM iPhone SE2 defaults
+set "SE2=192.168.50.20"
+set "UDIDSE2=308e6361884208deb815e12efc230a028ddc4b1a"
+
+REM TrollVNC password (for info only - viewer will still prompt)
+set "TVNC_PW=test1234"
+
+REM Performance mode: 0=Best quality (default), 1=Fast (auto-select)
+set "PERF_MODE=0"
+
+REM VNC flags when PERF_MODE=1 (let RealVNC auto-optimize)
+set "VNC_PERF_FLAGS=-AutoSelect=1"
+
+REM ==========================================================
+REM  Load config file if present (overrides defaults above)
+REM ==========================================================
+if exist "%CONFIG_FILE%" (
+  for /f "usebackq tokens=1,2 delims==" %%A in ("%CONFIG_FILE%") do (
+    if not "%%B"=="" set "%%A=%%B"
+  )
+)
+
+REM ==========================================================
+REM  Locate RealVNC Viewer
+REM ==========================================================
+set "VNC_EXE="
+if exist "C:\Program Files\RealVNC\VNC Viewer\vncviewer.exe" set "VNC_EXE=C:\Program Files\RealVNC\VNC Viewer\vncviewer.exe"
+if not defined VNC_EXE if exist "C:\Program Files (x86)\RealVNC\VNC Viewer\vncviewer.exe" set "VNC_EXE=C:\Program Files (x86)\RealVNC\VNC Viewer\vncviewer.exe"
+
+REM Uncomment to use a different viewer:
+REM set "VNC_EXE=C:\Path\To\Your\vncviewer.exe"
+
+:menu
+cls
+echo ==========================================================
+echo   TrollVNC / iProxy Launcher v2.0
+echo ==========================================================
+echo.
+echo  iPhone 8  : %UDID8:~0,12%...  (USB -^> :5901)
+echo  iPhone SE2: %UDIDSE2:~0,12%...  (USB -^> :5902)
+echo.
+echo  iPhone 8 Wi-Fi IP : %IP8%
+echo  iPhone SE2 Wi-Fi IP: %SE2%
+echo.
+echo  TrollVNC password: %TVNC_PW%
+echo.
+if "%PERF_MODE%"=="1" (
+  echo  Performance Mode: ON  (Auto-select quality)
+) else (
+  echo  Performance Mode: OFF (Best quality)
+)
+echo.
+if not defined VNC_EXE (
+  echo  [WARN] RealVNC Viewer not auto-detected.
+  echo         Set VNC_EXE at the top of this script or install RealVNC.
+  echo.
+)
+echo  --- DUAL CONNECTIONS ---
+echo  [1] Launch BOTH USB    (iPhone 8 :5901 + SE2 :5902)
+echo  [2] Launch BOTH        (SE2 Wi-Fi + iPhone 8 USB)
+echo  [3] Launch BOTH        (SE2 USB + iPhone 8 Wi-Fi)
+echo.
+echo  --- SINGLE CONNECTIONS ---
+echo  [4] Launch SE2 USB only
+echo  [5] Launch SE2 Wi-Fi only
+echo  [6] Launch iPhone 8 USB only
+echo  [7] Launch iPhone 8 Wi-Fi only
+echo.
+echo  --- SETTINGS ---
+echo  [8] Stop / kill all iproxy
+echo  [9] Set iPhone 8 Wi-Fi IP
+echo [10] Set iPhone SE2 Wi-Fi IP
+echo  [P] Toggle Performance Mode
+echo  [Q] Exit
+echo.
+set /p choice=Select option:
+
+if /i "%choice%"=="1" goto both_usb
+if /i "%choice%"=="2" goto both_usb8_wifiSE2
+if /i "%choice%"=="3" goto both_usbSE2_wifi8
+if /i "%choice%"=="4" goto se2_usb
+if /i "%choice%"=="5" goto se2_wifi
+if /i "%choice%"=="6" goto ip8_usb
+if /i "%choice%"=="7" goto ip8_wifi
+if /i "%choice%"=="8" goto stop_iproxy
+if /i "%choice%"=="9" goto set_ip8
+if /i "%choice%"=="10" goto set_se2
+if /i "%choice%"=="P" goto toggle_perf
+if /i "%choice%"=="Q" goto :eof
+
+goto menu
+
+REM ==========================================================
+REM  Helper routines
+REM ==========================================================
+
+:save_config
+> "%CONFIG_FILE%" (
+  echo IP8=%IP8%
+  echo SE2=%SE2%
+  echo UDID8=%UDID8%
+  echo UDIDSE2=%UDIDSE2%
+  echo PERF_MODE=%PERF_MODE%
+)
+goto :eof
+
+:kill_iproxy
+REM Kill all iproxy processes on VNC ports (5901, 5902), preserve SSH (2222)
+echo [INFO] Stopping existing iproxy tunnels...
+for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":5901.*LISTENING"') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
+for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":5902.*LISTENING"') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
+REM Also kill any orphaned iproxy not bound yet
+taskkill /F /IM iproxy.exe >nul 2>&1
+REM Kill existing VNC viewers to prevent duplicates
+taskkill /F /IM vncviewer.exe >nul 2>&1
+timeout /t 1 >nul
+goto :eof
+
+:wait_tunnel_port
+REM %1 = port number to wait for
+REM Poll for port to be listening (max 5 seconds)
+set /a _attempts=0
+:_wait_loop
+netstat -an 2>nul | findstr ":%1.*LISTENING" >nul 2>&1
+if %errorlevel%==0 (
+  echo [OK] Port %1 ready
+  goto :eof
+)
+set /a _attempts+=1
+if %_attempts% gtr 10 (
+  echo [WARN] Port %1 may not be ready - continuing anyway
+  goto :eof
+)
+timeout /t 1 >nul
+goto _wait_loop
+
+:connect_vnc
+REM %1 = host:port
+if not defined VNC_EXE (
+  echo [INFO] VNC_EXE not set. Connect manually to: %1
+  goto :eof
+)
+echo [INFO] Connecting to %1
+if "%PERF_MODE%"=="1" (
+  start "" "%VNC_EXE%" %VNC_PERF_FLAGS% %1
+) else (
+  start "" "%VNC_EXE%" %1
+)
+goto :eof
+
+REM ==========================================================
+REM  Menu actions
+REM ==========================================================
+
+:both_usb
+REM BOTH iPhones over USB - different local ports
+echo.
+echo [INFO] Launching BOTH iPhones over USB...
+echo        iPhone 8  -^> localhost:5901
+echo        iPhone SE2 -^> localhost:5902
+echo.
+call :kill_iproxy
+start "iPhone8 iProxy (5901)" /min iproxy.exe -u %UDID8% 5901 5901
+timeout /t 1 >nul
+start "SE2 iProxy (5902)" /min iproxy.exe -u %UDIDSE2% 5902 5901
+echo [INFO] Waiting for tunnels...
+call :wait_tunnel_port 5901
+call :wait_tunnel_port 5902
+call :connect_vnc localhost:5901
+call :connect_vnc localhost:5902
+echo.
+echo [OK] Both VNC viewers launched!
+pause
+goto menu
+
+:both_usb8_wifiSE2
+REM iPhone 8 over USB, SE2 over Wi-Fi
+echo.
+echo [INFO] Launching iPhone 8 USB + SE2 Wi-Fi...
+call :kill_iproxy
+start "iPhone8 iProxy (5901)" /min iproxy.exe -u %UDID8% 5901 5901
+call :wait_tunnel_port 5901
+call :connect_vnc localhost:5901
+call :connect_vnc %SE2%:5901
+echo.
+echo [OK] Both VNC viewers launched!
+pause
+goto menu
+
+:both_usbSE2_wifi8
+REM SE2 over USB, iPhone 8 over Wi-Fi
+echo.
+echo [INFO] Launching SE2 USB + iPhone 8 Wi-Fi...
+call :kill_iproxy
+start "SE2 iProxy (5902)" /min iproxy.exe -u %UDIDSE2% 5902 5901
+call :wait_tunnel_port 5902
+call :connect_vnc localhost:5902
+call :connect_vnc %IP8%:5901
+echo.
+echo [OK] Both VNC viewers launched!
+pause
+goto menu
+
+:se2_usb
+echo.
+echo [INFO] Launching SE2 over USB (port 5902)...
+call :kill_iproxy
+start "SE2 iProxy (5902)" /min iproxy.exe -u %UDIDSE2% 5902 5901
+call :wait_tunnel_port 5902
+call :connect_vnc localhost:5902
+pause
+goto menu
+
+:se2_wifi
+echo.
+echo [INFO] Connecting to SE2 over Wi-Fi...
+call :connect_vnc %SE2%:5901
+pause
+goto menu
+
+:ip8_usb
+echo.
+echo [INFO] Launching iPhone 8 over USB (port 5901)...
+call :kill_iproxy
+start "iPhone8 iProxy (5901)" /min iproxy.exe -u %UDID8% 5901 5901
+call :wait_tunnel_port 5901
+call :connect_vnc localhost:5901
+pause
+goto menu
+
+:ip8_wifi
+echo.
+echo [INFO] Connecting to iPhone 8 over Wi-Fi...
+call :connect_vnc %IP8%:5901
+pause
+goto menu
+
+:stop_iproxy
+echo.
+call :kill_iproxy
+echo [OK] All iproxy VNC tunnels terminated.
+echo      (SSH tunnels on port 2222 preserved for iOS-VCAM)
+pause
+goto menu
+
+:set_ip8
+echo.
+echo Current iPhone 8 Wi-Fi IP: %IP8%
+set /p "newip=Enter new IP (blank = keep current): "
+if not "%newip%"=="" set "IP8=%newip%"
+call :save_config
+echo [OK] Saved.
+pause
+goto menu
+
+:set_se2
+echo.
+echo Current iPhone SE2 Wi-Fi IP: %SE2%
+set /p "newip=Enter new IP (blank = keep current): "
+if not "%newip%"=="" set "SE2=%newip%"
+call :save_config
+echo [OK] Saved.
+pause
+goto menu
+
+:toggle_perf
+if "%PERF_MODE%"=="0" (
+  set "PERF_MODE=1"
+  echo.
+  echo [OK] Performance Mode: ON (Auto-select quality)
+) else (
+  set "PERF_MODE=0"
+  echo.
+  echo [OK] Performance Mode: OFF (Best quality)
+)
+call :save_config
+timeout /t 1 >nul
+goto menu

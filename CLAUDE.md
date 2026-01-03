@@ -117,7 +117,54 @@ Stream RTMP from iPhone to PC over USB cable using SSH reverse tunneling. Elimin
 
 **Files:**
 - Pre-built .deb: `ios/modified_debs/iosvcam_base_127_10_10_10.deb`
-- Full docs: `tasks/USB-SSH-STREAMING-GUIDE.md`
+- Full docs: `docs/Streaming-Guide.md`
+
+**Jetsam Protection (Requires jetsamctl):**
+The launcher automatically applies jetsam protection to TrollVNC and sshd daemons when starting USB streaming. This prevents iOS from killing these processes when 3rd party camera apps (Safari, etc.) request camera access.
+
+**⚠️ PREREQUISITE: Install jetsamctl on iPhone first!**
+```bash
+apt install jetsamctl   # Or via Sileo from BigBoss/Havoc repo
+```
+
+Without jetsamctl, VNC will crash when camera apps open. The launcher checks for it and warns if missing.
+
+| Method | Persistence | Works? |
+|--------|-------------|--------|
+| Plist modification | Persists after reboot | ❌ Ignored by rootless jailbreaks |
+| jetsamctl runtime | Needs reapply each session | ✅ Actually works |
+
+The launcher now uses **both** methods: plist (backup) + jetsamctl (primary). jetsamctl runs every USB streaming session to apply kernel-level protection.
+
+See `docs/USB-Camera-Conflict-Analysis.md` for technical details.
+
+### CRITICAL: After iPhone Reboot / Re-Jailbreak
+
+USB streaming will fail after reboot until these are restored (see `docs/Post-Reboot-Checklist.md`):
+
+| What Gets Lost | Fix |
+|---------------|-----|
+| SSH host key changes | Launcher auto-probes fingerprint with `-hostkey` pinning |
+| sshd GatewayPorts | Launcher auto-fixes config and restarts sshd |
+| Loopback alias 127.10.10.10 | Launcher sets up alias automatically |
+
+**If tunnel shows "REFUSED"**: sshd config needs these lines:
+```
+AllowTcpForwarding yes
+GatewayPorts clientspecified
+```
+
+The launcher now handles this automatically, but manual fix if needed:
+```powershell
+# Get fingerprint
+$fp = (.\plink.exe -ssh -batch -P 2222 -pw icemat root@localhost exit 2>&1 | Select-String "SHA256:").Matches.Value
+
+# Fix sshd and restart
+.\plink.exe -hostkey $fp -ssh -P 2222 -pw icemat root@localhost 'echo "GatewayPorts clientspecified" >> /etc/ssh/sshd_config; launchctl unload /Library/LaunchDaemons/com.openssh.sshd.plist; launchctl load /Library/LaunchDaemons/com.openssh.sshd.plist'
+
+# Get NEW fingerprint (changes after restart!)
+$fp = (.\plink.exe -ssh -batch -P 2222 -pw icemat root@localhost exit 2>&1 | Select-String "SHA256:").Matches.Value
+```
 
 ### iOS .deb Package System
 
@@ -216,6 +263,9 @@ User-facing wiki documentation lives in `docs/`:
 | `Streaming-Guide.md` | WiFi/USB streaming howto |
 | `Troubleshooting.md` | Common issues and fixes |
 | `Advanced-Features.md` | SSH, debranding, Frida, architecture |
+| `iPhone-SSH-Quick-Reference.md` | SSH via USB (iproxy + plink) - device UDIDs, credentials |
+| `USB-Streaming-Debugging.md` | Comprehensive USB tunnel debugging guide |
+| `Post-Reboot-Checklist.md` | Recovery steps after iPhone reboot |
 
 **Maintenance Rules:**
 - When menu options change, update references in docs (e.g., "Option [3]")

@@ -1,0 +1,653 @@
+diff --git a/iOS-VCAM-Launcher.ps1 b/iOS-VCAM-Launcher.ps1
+index e7d9ccd..7d2c14a 100644
+--- a/iOS-VCAM-Launcher.ps1
++++ b/iOS-VCAM-Launcher.ps1
+@@ -1310,15 +1310,21 @@ function Update-MonibucaConfigIP {
+ }
+ 
+ function Start-MonibucaViaSshUsb {
+     <#
+     .SYNOPSIS
+-        Starts Monibuca streaming over USB using SSH reverse tunnel.
++        Starts complete USB streaming solution with Flask auth + Monibuca via SSH tunnels.
+     .DESCRIPTION
+-        Launches iproxy (USB port forwarding), SSH reverse tunnel, and Monibuca server
+-        to enable RTMP streaming from iPhone to PC over USB cable without WiFi.
++        Launches all components needed for USB streaming:
++        1. iproxy - USB port forwarding (localhost:2222 -> iPhone:22)
++        2. Flask server - HTTP auth on port 80
++        3. Monibuca server - RTMP streaming on port 1935
++        4. SSH tunnels - Forward ports 80 and 1935 from iPhone to PC
++        5. iPhone IP alias - Routes 127.10.10.10 to loopback
++
+         iPhone app connects to rtmp://127.10.10.10:1935/live/srs which tunnels back to PC.
++        HTTP auth at http://127.10.10.10/I also tunnels back to Flask on PC.
+     #>
+     try { Clear-Host } catch { Write-Host "Note: Could not clear console" -ForegroundColor Gray }
+     Write-Host ""
+     Write-Host "    =====================================================================================" -ForegroundColor Magenta
+     Write-Host "                      🔌 USB STREAMING VIA SSH REVERSE TUNNEL                           " -ForegroundColor White
+@@ -1326,17 +1332,61 @@ function Start-MonibucaViaSshUsb {
+     Write-Host ""
+ 
+     # Track verification results for conditional READY banner
+     $allReady = $true
+ 
+-    Write-Host "[INFO] Preparing USB streaming with SSH tunnel..." -ForegroundColor Green
++    Write-Host "[INFO] Preparing complete USB streaming solution..." -ForegroundColor Green
++    Write-Host "       Flask (HTTP auth) + Monibuca (RTMP) + Dual SSH tunnels" -ForegroundColor Gray
++    Write-Host ""
++
++    # Set up combined log file
++    $logDir = Join-Path $script:SRSHome "logs"
++    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
++    $script:UsbLogFile = Join-Path $logDir "usb-streaming-$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').log"
++
++    # Helper function to write to both console and log
++    function Write-Log {
++        param([string]$Message, [string]$Color = "White", [switch]$NoNewline)
++        $timestamp = Get-Date -Format "HH:mm:ss"
++        $logMessage = "[$timestamp] $Message"
++        Add-Content -Path $script:UsbLogFile -Value $logMessage -ErrorAction SilentlyContinue
++        if ($NoNewline) {
++            Write-Host $Message -ForegroundColor $Color -NoNewline
++        } else {
++            Write-Host $Message -ForegroundColor $Color
++        }
++    }
++
++    Write-Log "USB Streaming session started"
++    Write-Log "Log file: $script:UsbLogFile"
++    Write-Host "  📝 Log: $script:UsbLogFile" -ForegroundColor Gray
+     Write-Host ""
+ 
++    # Check if running as admin (needed for port 80)
++    $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
++    if (-not $isAdmin) {
++        Write-Host "  ⚠️  WARNING: Not running as Administrator!" -ForegroundColor Yellow
++        Write-Host "     Port 80 (Flask HTTP auth) requires admin privileges." -ForegroundColor Gray
++        Write-Host ""
++        Write-Host "  Options:" -ForegroundColor Cyan
++        Write-Host "     [1] Restart launcher as Administrator (recommended)" -ForegroundColor White
++        Write-Host "     [2] Continue anyway (Flask may fail)" -ForegroundColor Gray
++        Write-Host ""
++        $adminChoice = Read-Host "     Select option (1-2)"
++        if ($adminChoice -eq "1") {
++            Write-Host ""
++            Write-Host "  🔄 Restarting as Administrator..." -ForegroundColor Yellow
++            Start-Process powershell -Verb RunAs -ArgumentList "-ExecutionPolicy Bypass -File `"$PSCommandPath`""
++            return
++        }
++        Write-Host ""
++    }
++
+     # ============================================================================
+     # STEP 1: Check Prerequisites
+     # ============================================================================
+-    Write-Host "[STEP 1/7] 🔍 Checking prerequisites..." -ForegroundColor Yellow
++    Write-Host "[STEP 1/9] 🔍 Checking prerequisites..." -ForegroundColor Yellow
+ 
+     # Check for iproxy.exe
+     $iproxyPath = "C:\iProxy\iproxy.exe"
+     if (-not (Test-Path $iproxyPath)) {
+         $iproxyPath = Resolve-ExecutablePath "" "iproxy.exe"
+@@ -1387,16 +1437,65 @@ function Start-MonibucaViaSshUsb {
+         Write-Host ""
+         Read-Host "Press Enter to return to menu..."
+         return
+     }
+     Write-Host "  ✅ Monibuca found: $monibucaPath" -ForegroundColor Green
++
++    # Check for server.py (Flask auth server)
++    $flaskServerPath = Join-Path $script:SRSHome "server.py"
++    if (-not (Test-Path $flaskServerPath)) {
++        Write-Host "  ❌ server.py not found: $flaskServerPath" -ForegroundColor Red
++        Write-Host "     Flask auth server is required for iOS app authentication" -ForegroundColor Gray
++        Write-Host ""
++        Read-Host "Press Enter to return to menu..."
++        return
++    }
++    Write-Host "  ✅ Flask server found: $flaskServerPath" -ForegroundColor Green
++
++    # Check Python and Flask
++    $pythonOK = $false
++    try {
++        $pythonVersion = & python --version 2>&1
++        if ($pythonVersion -match "Python (\d+\.\d+)") {
++            $pythonOK = $true
++            Write-Host "  ✅ Python found: $pythonVersion" -ForegroundColor Green
++        }
++    } catch { }
++    if (-not $pythonOK) {
++        Write-Host "  ❌ Python not found in PATH!" -ForegroundColor Red
++        Write-Host "     Install from: https://www.python.org/downloads/" -ForegroundColor Yellow
++        Write-Host ""
++        Read-Host "Press Enter to return to menu..."
++        return
++    }
++
++    # Check Flask installed
++    $flaskOK = $false
++    try {
++        & python -c "import flask" 2>&1 | Out-Null
++        if ($LASTEXITCODE -eq 0) {
++            $flaskOK = $true
++            Write-Host "  ✅ Flask module installed" -ForegroundColor Green
++        }
++    } catch { }
++    if (-not $flaskOK) {
++        Write-Host "  📦 Installing Flask..." -ForegroundColor Yellow
++        & python -m pip install flask 2>&1 | Out-Null
++        if ($LASTEXITCODE -eq 0) {
++            Write-Host "  ✅ Flask installed successfully" -ForegroundColor Green
++        } else {
++            Write-Host "  ❌ Failed to install Flask" -ForegroundColor Red
++            Read-Host "Press Enter to return to menu..."
++            return
++        }
++    }
+     Write-Host ""
+ 
+     # ============================================================================
+     # STEP 2: Detect iPhone via USB
+     # ============================================================================
+-    Write-Host "[STEP 2/7] 📱 Detecting iPhone via USB..." -ForegroundColor Yellow
++    Write-Host "[STEP 2/9] 📱 Detecting iPhone via USB..." -ForegroundColor Yellow
+ 
+     $udidOutput = $null
+     $ideviceError = $null
+     try {
+         $udidOutput = & $ideviceIdPath -l 2>&1
+@@ -1422,17 +1521,43 @@ function Start-MonibucaViaSshUsb {
+         Write-Host "    4. Try unplugging and reconnecting the cable" -ForegroundColor Gray
+         Write-Host ""
+         Read-Host "Press Enter to return to menu..."
+         return
+     }
+-    Write-Host "  ✅ iPhone detected: $($udidOutput.Trim())" -ForegroundColor Green
++
++    # Handle multiple devices - let user choose or use first one
++    # Strip carriage returns, newlines and whitespace, filter to valid UDIDs only
++    $udidLines = @($udidOutput -split "`r`n|`n|`r" | ForEach-Object { $_.Trim() } | Where-Object { $_ -match "^[a-fA-F0-9\-]+$" })
++
++    # Device name mappings (UDID -> friendly name)
++    $deviceNames = @{
++        "00008030-001229C01146402E" = "iPhone 8"
++        "308e6361884208deb815e12efc230a028ddc4b1a" = "iPhone SE2"
++    }
++
++    if ($udidLines.Count -gt 1) {
++        Write-Host "  📱 Multiple devices detected:" -ForegroundColor Cyan
++        for ($i = 0; $i -lt $udidLines.Count; $i++) {
++            $udid = $udidLines[$i]
++            $name = if ($deviceNames.ContainsKey($udid)) { " ($($deviceNames[$udid]))" } else { "" }
++            Write-Host "     [$($i+1)] $udid$name" -ForegroundColor Gray
++        }
++        Write-Host ""
++        $deviceChoice = Read-Host "     Select device (1-$($udidLines.Count)) or Enter for first"
++        if ([string]::IsNullOrWhiteSpace($deviceChoice)) { $deviceChoice = "1" }
++        $selectedUDID = $udidLines[[int]$deviceChoice - 1]
++    } else {
++        $selectedUDID = if ($udidLines.Count -eq 1) { $udidLines[0] } else { $udidOutput.Trim() }
++    }
++    $deviceFriendlyName = if ($deviceNames.ContainsKey($selectedUDID)) { " ($($deviceNames[$selectedUDID]))" } else { "" }
++    Write-Host "  ✅ Using iPhone: $selectedUDID$deviceFriendlyName" -ForegroundColor Green
+     Write-Host ""
+ 
+     # ============================================================================
+     # STEP 3: Configure SSH credentials
+     # ============================================================================
+-    Write-Host "[STEP 3/7] 🔐 Configuring SSH credentials..." -ForegroundColor Yellow
++    Write-Host "[STEP 3/9] 🔐 Configuring SSH credentials..." -ForegroundColor Yellow
+ 
+     $config = Read-Config
+     $savedPassword = $config.SSHPassword
+     if ([string]::IsNullOrWhiteSpace($savedPassword)) {
+         $savedPassword = "alpine"
+@@ -1458,52 +1583,86 @@ function Start-MonibucaViaSshUsb {
+         Write-Host "  ℹ️  Note: Password is stored in config.ini (plaintext)" -ForegroundColor DarkGray
+     }
+     Write-Host ""
+ 
+     # ============================================================================
+-    # STEP 4: Clean up ports (including USB-specific port 2222)
++    # STEP 4: Clean up ports
+     # ============================================================================
+-    Write-Host "[STEP 4/7] 🧹 Cleaning up conflicting processes..." -ForegroundColor Yellow
++    Write-Host "[STEP 4/9] 🧹 Cleaning up conflicting processes..." -ForegroundColor Yellow
++
++    # Clean up port 80 (Flask)
++    $conn80 = Get-NetTCPConnection -LocalPort 80 -ErrorAction SilentlyContinue | Where-Object { $_.State -eq 'Listen' }
++    if ($conn80) {
++        foreach ($c in $conn80) {
++            $proc = Get-Process -Id $c.OwningProcess -ErrorAction SilentlyContinue
++            $pname = if ($proc) { $proc.ProcessName } else { "(unknown)" }
++            Write-Host "  🔥 Stopping '$pname' on port 80 (PID: $($c.OwningProcess))" -ForegroundColor Red
++            try {
++                Stop-Process -Id $c.OwningProcess -Force -ErrorAction Stop
++            } catch {
++                Write-Host "  ⚠️ Could not stop PID $($c.OwningProcess): $_" -ForegroundColor Yellow
++            }
++        }
++    }
++
++    # Clean up port 1935 (Monibuca RTMP) and other streaming ports
+     Clear-SRSPorts
+ 
+-    # Also clean up port 2222 (used for USB SSH forwarding)
+-    try {
+-        $conn2222 = Get-NetTCPConnection -LocalPort 2222 -ErrorAction Stop
++    # Clean up port 2222 (iproxy for SSH)
++    $conn2222 = Get-NetTCPConnection -LocalPort 2222 -ErrorAction SilentlyContinue | Where-Object { $_.State -eq 'Listen' }
++    if ($conn2222) {
+         foreach ($c in $conn2222) {
+             $proc = Get-Process -Id $c.OwningProcess -ErrorAction SilentlyContinue
+             $pname = if ($proc) { $proc.ProcessName } else { "(unknown)" }
+             Write-Host "  🔥 Stopping '$pname' on port 2222 (PID: $($c.OwningProcess))" -ForegroundColor Red
+             try {
+                 Stop-Process -Id $c.OwningProcess -Force -ErrorAction Stop
+             } catch {
+                 Write-Host "  ⚠️ Could not stop PID $($c.OwningProcess): $_" -ForegroundColor Yellow
+             }
+         }
+-        Start-Sleep -Seconds 1
+-    } catch [Microsoft.PowerShell.Cmdlets.GetNetTCPConnectionCommand+NoMatchingConnectionException] {
+-        Write-Host "  ℹ️ Port 2222 is already free" -ForegroundColor Gray
+-    } catch {
+-        # Fallback for when no connections found (different error types on different Windows versions)
+-        if ($_.Exception.Message -match "No matching") {
+-            Write-Host "  ℹ️ Port 2222 is already free" -ForegroundColor Gray
+-        } else {
+-            Write-Host "  ⚠️ Could not check port 2222: $($_.Exception.Message)" -ForegroundColor Yellow
++    }
++
++    # Kill any existing plink processes for our tunnels
++    $existingPlinks = Get-Process -Name "plink" -ErrorAction SilentlyContinue
++    if ($existingPlinks) {
++        Write-Host "  🔥 Stopping existing plink processes..." -ForegroundColor Red
++        $existingPlinks | Stop-Process -Force -ErrorAction SilentlyContinue
++    }
++
++    # Kill any existing Monibuca processes (prevents port 50051 conflict)
++    $existingMonibuca = Get-Process -Name "monibuca" -ErrorAction SilentlyContinue
++    if ($existingMonibuca) {
++        Write-Host "  🔥 Stopping existing Monibuca processes..." -ForegroundColor Red
++        $existingMonibuca | Stop-Process -Force -ErrorAction SilentlyContinue
++    }
++
++    # Clean up port 50051 (Monibuca gRPC)
++    $conn50051 = Get-NetTCPConnection -LocalPort 50051 -ErrorAction SilentlyContinue | Where-Object { $_.State -eq 'Listen' }
++    if ($conn50051) {
++        foreach ($c in $conn50051) {
++            Write-Host "  🔥 Stopping process on port 50051 (PID: $($c.OwningProcess))" -ForegroundColor Red
++            try {
++                Stop-Process -Id $c.OwningProcess -Force -ErrorAction Stop
++            } catch { }
+         }
+     }
++
++    Start-Sleep -Seconds 2
++    Write-Host "  ✅ Ports cleared" -ForegroundColor Green
+     Write-Host ""
+ 
+     # ============================================================================
+-    # STEP 5: Get Monibuca config (with path validation)
++    # STEP 5: Get Monibuca config
+     # ============================================================================
+-    Write-Host "[STEP 5/7] 📄 Preparing Monibuca configuration..." -ForegroundColor Yellow
++    Write-Host "[STEP 5/9] 📄 Preparing Monibuca configuration..." -ForegroundColor Yellow
+ 
+     $profile = $config.MonibucaConfig
+     if ([string]::IsNullOrWhiteSpace($profile)) {
+         $profile = "monibuca_iphone_optimized.yaml"
+     }
+ 
+-    # Security: Validate profile is a simple filename (no path traversal)
+     $profileBasename = [System.IO.Path]::GetFileName($profile)
+     if ($profile -ne $profileBasename -or $profile -match "[/\\]") {
+         Write-Host "  ⚠️ Invalid config profile name, using default" -ForegroundColor Yellow
+         $profile = "monibuca_iphone_optimized.yaml"
+     }
+@@ -1524,112 +1683,141 @@ function Start-MonibucaViaSshUsb {
+     }
+     Write-Host "  ✅ Using config: $(Split-Path $configPath -Leaf)" -ForegroundColor Green
+     Write-Host ""
+ 
+     # ============================================================================
+-    # STEP 6: Launch iproxy (USB port forwarding)
++    # STEP 6: Launch iproxy (USB SSH forwarding)
+     # ============================================================================
+-    Write-Host "[STEP 6/7] 🚀 Launching streaming components..." -ForegroundColor Yellow
+-    Write-Host ""
+-
+-    # --- Launch iproxy (USB port forwarding: localhost:2222 -> iPhone:22) ---
+-    Write-Host "  [1/3] Starting iproxy (USB → SSH forwarding)..." -ForegroundColor Cyan
++    Write-Host "[STEP 6/9] 🚀 Starting iproxy (USB → SSH forwarding)..." -ForegroundColor Yellow
+ 
+     $iproxyCommand = @"
+-`$Host.UI.RawUI.WindowTitle = 'iProxy - USB Port Forwarder';
++`$Host.UI.RawUI.WindowTitle = 'iProxy - USB SSH$deviceFriendlyName';
+ Write-Host '========================================' -ForegroundColor Cyan;
+ Write-Host '    iProxy USB Port Forwarding         ' -ForegroundColor White;
+ Write-Host '========================================' -ForegroundColor Cyan;
+ Write-Host '';
+ Write-Host 'Forwarding: localhost:2222 -> iPhone:22' -ForegroundColor Yellow;
+-Write-Host 'This enables SSH over USB cable.' -ForegroundColor Gray;
++Write-Host 'Device: $selectedUDID$deviceFriendlyName' -ForegroundColor Gray;
+ Write-Host '';
+ Write-Host 'Keep this window open!' -ForegroundColor Green;
+ Write-Host '========================================' -ForegroundColor Cyan;
+ Write-Host '';
+-& '$iproxyPath' 2222 22;
++& '$iproxyPath' 2222 22 '$selectedUDID';
+ Write-Host '';
+ Write-Host 'iProxy stopped. Press any key to close...' -ForegroundColor Yellow;
+ `$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+ "@
+ 
+     Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $iproxyCommand -WindowStyle Normal
+ 
+-    # Verify iproxy is listening on port 2222 (polling with timeout)
++    # Wait for iproxy process to start (USB forwarding doesn't show as TCP listener)
+     $timeout = 10
+     $startTime = Get-Date
+-    $iproxyCheck = $null
++    $iproxyProc = $null
+     do {
+         Start-Sleep -Milliseconds 500
+-        $iproxyCheck = Get-NetTCPConnection -LocalPort 2222 -ErrorAction SilentlyContinue | Where-Object { $_.State -eq 'Listen' }
+-    } while (-not $iproxyCheck -and ((Get-Date) - $startTime).TotalSeconds -lt $timeout)
++        $iproxyProc = Get-Process -Name "iproxy" -ErrorAction SilentlyContinue
++    } while (-not $iproxyProc -and ((Get-Date) - $startTime).TotalSeconds -lt $timeout)
+ 
+-    if ($iproxyCheck) {
+-        Write-Host "  ✅ iproxy listening on port 2222" -ForegroundColor Green
++    if ($iproxyProc) {
++        Write-Host "  ✅ iproxy running (USB forwarding active)" -ForegroundColor Green
++        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP6: iproxy OK - process running"
+     } else {
+-        Write-Host "  ⚠️ iproxy not listening after ${timeout}s - check Cyan window" -ForegroundColor Yellow
++        Write-Host "  ❌ iproxy failed to start!" -ForegroundColor Red
++        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP6: iproxy FAILED - process not found"
+         $allReady = $false
+     }
++    Write-Host ""
+ 
+-    # --- Launch SSH reverse tunnel (remote port 1935 -> localhost:1935) ---
+-    Write-Host "  [2/3] Starting SSH reverse tunnel..." -ForegroundColor Cyan
++    # ============================================================================
++    # STEP 7: Launch Flask auth server (port 80)
++    # ============================================================================
++    Write-Host "[STEP 7/9] 🌐 Starting Flask auth server (port 80)..." -ForegroundColor Yellow
+ 
+-    $sshCommand = @"
+-`$Host.UI.RawUI.WindowTitle = 'SSH Tunnel - Port 1935';
+-Write-Host '========================================' -ForegroundColor Yellow;
+-Write-Host '    SSH Reverse Tunnel (Port 1935)     ' -ForegroundColor White;
+-Write-Host '========================================' -ForegroundColor Yellow;
++    $flaskCommand = @"
++`$Host.UI.RawUI.WindowTitle = 'Flask - HTTP Auth Server';
++Write-Host '========================================' -ForegroundColor Blue;
++Write-Host '    Flask HTTP Authentication Server   ' -ForegroundColor White;
++Write-Host '========================================' -ForegroundColor Blue;
+ Write-Host '';
+-Write-Host 'Tunnel: iPhone:1935 -> PC:1935 (Monibuca)' -ForegroundColor Cyan;
+-Write-Host 'Using saved SSH password (auto-login)' -ForegroundColor Gray;
++Write-Host 'Listening on: http://0.0.0.0:80/' -ForegroundColor Green;
++Write-Host 'iPhone auth endpoint: http://127.10.10.10/I' -ForegroundColor Cyan;
+ Write-Host '';
+-Write-Host 'FIRST TIME: Type "y" to accept host key' -ForegroundColor Magenta;
++Write-Host 'This handles iOS app authentication' -ForegroundColor Gray;
++Write-Host 'before RTMP streaming can begin.' -ForegroundColor Gray;
+ Write-Host '';
+-Write-Host 'iPhone RTMP URL: rtmp://127.10.10.10:1935/live/srs' -ForegroundColor Green;
+-Write-Host '========================================' -ForegroundColor Yellow;
++Write-Host '========================================' -ForegroundColor Blue;
+ Write-Host '';
+-& '$plinkPath' -ssh -R 1935:localhost:1935 -pw '$sshPassword' mobile@localhost -P 2222;
++Set-Location '$script:SRSHome';
++& python server.py --host 0.0.0.0 --port 80;
+ Write-Host '';
+-Write-Host 'SSH tunnel closed. Press any key to close...' -ForegroundColor Yellow;
++Write-Host 'Flask stopped. Press any key to close...' -ForegroundColor Yellow;
+ `$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+ "@
+ 
+-    # Count existing plink processes before launching
+-    $plinkCountBefore = @(Get-Process -Name "plink" -ErrorAction SilentlyContinue).Count
+-
+-    Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $sshCommand -WindowStyle Normal
++    Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $flaskCommand -WindowStyle Normal
+ 
+-    # Verify SSH tunnel process started (check for new plink process)
++    # Give Flask time to initialize Python environment
+     Start-Sleep -Seconds 3
+-    $plinkCountAfter = @(Get-Process -Name "plink" -ErrorAction SilentlyContinue).Count
+-    if ($plinkCountAfter -gt $plinkCountBefore) {
+-        Write-Host "  ✅ SSH tunnel process started" -ForegroundColor Green
+-        Write-Host "     Check yellow window for connection status" -ForegroundColor Gray
++
++    # Wait for Flask to start listening on port 80
++    $timeout = 20
++    $startTime = Get-Date
++    $flaskCheck = $null
++    do {
++        Start-Sleep -Milliseconds 500
++        $flaskCheck = Get-NetTCPConnection -LocalPort 80 -ErrorAction SilentlyContinue | Where-Object { $_.State -eq 'Listen' }
++    } while (-not $flaskCheck -and ((Get-Date) - $startTime).TotalSeconds -lt $timeout)
++
++    if ($flaskCheck) {
++        # Verify it's actually Python/Flask, not System process (PID 4 = IIS/HTTP.sys)
++        $port80Proc = Get-Process -Id $flaskCheck.OwningProcess -ErrorAction SilentlyContinue
++        if ($port80Proc -and $port80Proc.ProcessName -match 'python|flask') {
++            Write-Host "  ✅ Flask listening on port 80" -ForegroundColor Green
++            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP7: Flask OK - Python listening on port 80"
++        } elseif ($flaskCheck.OwningProcess -eq 4) {
++            Write-Host "  ❌ Port 80 held by System/IIS (PID 4)!" -ForegroundColor Red
++            Write-Host "     Stop IIS: Stop-Service W3SVC -Force" -ForegroundColor Gray
++            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP7: Flask BLOCKED - Port 80 held by System/IIS"
++            $allReady = $false
++        } else {
++            Write-Host "  ⚠️ Port 80 held by: $($port80Proc.ProcessName) (PID: $($flaskCheck.OwningProcess))" -ForegroundColor Yellow
++            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP7: Flask BLOCKED - Port 80 held by $($port80Proc.ProcessName)"
++            $allReady = $false
++        }
+     } else {
+-        Write-Host "  ⚠️ SSH tunnel process may have exited" -ForegroundColor Yellow
+-        Write-Host "     Check yellow window for errors" -ForegroundColor Gray
++        # Check if Python process is at least running (Flask may be starting)
++        $pythonProc = Get-Process -Name "python*" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match 'server\.py' -or $_.MainWindowTitle -match 'Flask' }
++        if ($pythonProc) {
++            Write-Host "  ⚠️ Flask process running but port 80 not yet bound" -ForegroundColor Yellow
++            Write-Host "     Check Flask window for errors" -ForegroundColor Gray
++            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP7: Flask process exists but port 80 not bound"
++        } else {
++            Write-Host "  ❌ Flask failed to start on port 80!" -ForegroundColor Red
++            Write-Host "     Port 80 may require admin privileges" -ForegroundColor Gray
++            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP7: Flask FAILED - not listening on port 80"
++        }
+         $allReady = $false
+     }
+     Write-Host ""
+-    Write-Host "  ⚠️  FIRST TIME: Accept SSH host key (type 'y') in the yellow window" -ForegroundColor Yellow
+-    Write-Host "      Password auto-provided from saved config" -ForegroundColor Gray
+-    Write-Host "      (Tip: Use -batch flag to fail immediately on unknown host)" -ForegroundColor DarkGray
+-    Write-Host ""
+ 
+-    # --- Launch Monibuca ---
+-    Write-Host "  [3/3] Starting Monibuca server..." -ForegroundColor Cyan
++    # ============================================================================
++    # STEP 8: Launch Monibuca server (port 1935)
++    # ============================================================================
++    Write-Host "[STEP 8/9] 📺 Starting Monibuca RTMP server (port 1935)..." -ForegroundColor Yellow
+     $configFullPath = (Resolve-Path $configPath).Path
+ 
+     $monibucaCommand = @"
+-`$Host.UI.RawUI.WindowTitle = 'Monibuca - USB Streaming';
++`$Host.UI.RawUI.WindowTitle = 'Monibuca - RTMP Server';
+ Write-Host '========================================' -ForegroundColor Magenta;
+-Write-Host '    MONIBUCA - USB STREAMING SERVER    ' -ForegroundColor White;
++Write-Host '    MONIBUCA - RTMP STREAMING SERVER   ' -ForegroundColor White;
+ Write-Host '========================================' -ForegroundColor Magenta;
+ Write-Host '';
+ Write-Host 'Listening for RTMP on port 1935' -ForegroundColor Green;
+-Write-Host 'iPhone connects via SSH tunnel to:' -ForegroundColor Gray;
+-Write-Host '  rtmp://127.10.10.10:1935/live/srs' -ForegroundColor Cyan;
++Write-Host '';
++Write-Host 'OBS/Streaming Software:' -ForegroundColor Cyan;
++Write-Host '  rtmp://localhost:1935/live/srs' -ForegroundColor White;
+ Write-Host '';
+ Write-Host 'Web Console: http://localhost:8081/' -ForegroundColor Green;
+ Write-Host '========================================' -ForegroundColor Magenta;
+ Write-Host '';
+ Set-Location '$script:SRSHome';
+@@ -1639,55 +1827,136 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
+ `$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+ "@
+ 
+     Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $monibucaCommand -WindowStyle Normal
+ 
+-    # Verify Monibuca is listening on port 1935 (polling with timeout)
+-    $timeout = 10
++    # Give Monibuca time to initialize
++    Start-Sleep -Seconds 2
++
++    # Wait for Monibuca to start listening on port 1935
++    $timeout = 20
+     $startTime = Get-Date
+     $monibucaCheck = $null
+     do {
+         Start-Sleep -Milliseconds 500
+         $monibucaCheck = Get-NetTCPConnection -LocalPort 1935 -ErrorAction SilentlyContinue | Where-Object { $_.State -eq 'Listen' }
+     } while (-not $monibucaCheck -and ((Get-Date) - $startTime).TotalSeconds -lt $timeout)
+ 
+     if ($monibucaCheck) {
+-        Write-Host "  ✅ Monibuca server listening on port 1935" -ForegroundColor Green
++        Write-Host "  ✅ Monibuca listening on port 1935" -ForegroundColor Green
++        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP8: Monibuca OK - listening on port 1935"
++    } else {
++        # Check if process is at least running
++        $monibucaProc = Get-Process -Name "monibuca" -ErrorAction SilentlyContinue
++        if ($monibucaProc) {
++            Write-Host "  ⚠️ Monibuca process running but port 1935 not yet bound" -ForegroundColor Yellow
++            Write-Host "     Check Monibuca window for errors" -ForegroundColor Gray
++            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP8: Monibuca process exists but port 1935 not bound"
++        } else {
++            Write-Host "  ❌ Monibuca failed to start!" -ForegroundColor Red
++            Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP8: Monibuca FAILED"
++        }
++        $allReady = $false
++    }
++    Write-Host ""
++
++    # ============================================================================
++    # STEP 9: Launch SSH tunnels + iPhone IP alias
++    # ============================================================================
++    Write-Host "[STEP 9/9] 🔗 Starting SSH tunnels (ports 80 + 1935)..." -ForegroundColor Yellow
++    Write-Host ""
++    Write-Host "  This step creates reverse tunnels AND sets up iPhone IP alias." -ForegroundColor Gray
++    Write-Host "  ⚠️  FIRST TIME: Type 'y' to accept SSH host key when prompted!" -ForegroundColor Yellow
++    Write-Host ""
++
++    # Configure iPhone IP alias (GatewayPorts should already be enabled - see USB-STREAMING-WORKING.md)
++    Write-Host "  🔧 Setting up iPhone IP alias..." -ForegroundColor Gray
++    # Simple command without nested quotes to avoid escaping issues through plink→zsh
++    $aliasCmd = 'ifconfig lo0 alias 127.10.10.10 netmask 255.255.255.255; echo ALIAS_OK'
++    $aliasResult = & $plinkPath -ssh -batch -pw $sshPassword root@localhost -P 2222 $aliasCmd 2>&1
++    if ($aliasResult -match 'ALIAS_OK') {
++        Write-Host "  ✅ iPhone IP alias configured (127.10.10.10)" -ForegroundColor Green
++        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] iPhone alias OK"
++    } else {
++        Write-Host "  ⚠️ iPhone alias may have issues (continuing anyway)" -ForegroundColor Yellow
++        Write-Host "     Run manually on iPhone: ifconfig lo0 alias 127.10.10.10" -ForegroundColor Gray
++        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] iPhone alias warning: $aliasResult"
++    }
++
++    # Start SSH tunnel with -batch mode and a keep-alive command (tunnel dies without a command!)
++    Write-Host "  🔗 Starting SSH reverse tunnel..." -ForegroundColor Gray
++
++    # CRITICAL: plink MUST use -batch AND have a running command or the tunnel won't bind ports!
++    # Using 'cat' as keep-alive - it waits forever for input that never comes
++    $tunnelCommand = @"
++`$Host.UI.RawUI.WindowTitle = 'SSH Tunnel - KEEP OPEN';
++Write-Host '========================================' -ForegroundColor Yellow;
++Write-Host '  SSH REVERSE TUNNEL - KEEP THIS OPEN  ' -ForegroundColor White;
++Write-Host '========================================' -ForegroundColor Yellow;
++Write-Host '';
++Write-Host 'Tunneling ports 80 + 1935 to iPhone' -ForegroundColor Cyan;
++Write-Host 'If you close this window, streaming stops!' -ForegroundColor Red;
++Write-Host '';
++& '$plinkPath' -ssh -batch -R 127.10.10.10:80:localhost:80 -R 127.10.10.10:1935:localhost:1935 -pw $sshPassword root@localhost -P 2222 'echo TUNNEL_ACTIVE; cat';
++Write-Host '';
++Write-Host 'SSH Tunnel disconnected. Press any key...' -ForegroundColor Yellow;
++`$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
++"@
++    Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $tunnelCommand -WindowStyle Normal
++
++    # Give SSH time to connect and set up tunnels
++    Write-Host "  ⏳ Waiting for SSH connection..." -ForegroundColor Gray
++    Start-Sleep -Seconds 5
++
++    # Verify plink process started
++    $plinkProcs = Get-Process -Name "plink" -ErrorAction SilentlyContinue
++    if ($plinkProcs) {
++        Write-Host "  ✅ SSH tunnel process running" -ForegroundColor Green
++        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel process OK"
+     } else {
+-        Write-Host "  ⚠️ Monibuca not listening after ${timeout}s - check Magenta window" -ForegroundColor Yellow
++        Write-Host "  ⚠️ SSH tunnel may have failed - check yellow window" -ForegroundColor Yellow
++        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] STEP9: SSH tunnel process NOT FOUND"
+         $allReady = $false
+     }
+     Write-Host ""
+ 
+     # ============================================================================
+-    # STEP 7/7: FINAL STATUS
++    # FINAL STATUS
+     # ============================================================================
+     Write-Host ""
+     if ($allReady) {
+         Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
+         Write-Host "                    ✅ USB STREAMING SOLUTION READY                         " -BackgroundColor DarkGreen -ForegroundColor White
+         Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
++        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] FINAL: ALL SERVICES READY"
+     } else {
+         Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Yellow
+         Write-Host "              ⚠️ USB STREAMING STARTED WITH WARNINGS                        " -BackgroundColor DarkYellow -ForegroundColor Black
+         Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Yellow
++        Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] FINAL: STARTED WITH WARNINGS - check log for details"
+     }
+     Write-Host ""
+-    Write-Host "  🔌 Three windows launched:" -ForegroundColor White
+-    Write-Host "     1. iProxy (Cyan)    - USB port forwarding" -ForegroundColor Cyan
+-    Write-Host "     2. SSH Tunnel (Yellow) - Reverse tunnel to iPhone" -ForegroundColor Yellow
+-    Write-Host "     3. Monibuca (Magenta)  - RTMP streaming server" -ForegroundColor Magenta
++    Write-Host "  🔌 Four windows launched:" -ForegroundColor White
++    Write-Host "     1. iProxy (Cyan)        - USB port forwarding" -ForegroundColor Cyan
++    Write-Host "     2. Flask (Blue)         - HTTP auth server (port 80)" -ForegroundColor Blue
++    Write-Host "     3. Monibuca (Magenta)   - RTMP streaming server (port 1935)" -ForegroundColor Magenta
++    Write-Host "     4. SSH Tunnels (Yellow) - Reverse tunnels to iPhone" -ForegroundColor Yellow
+     Write-Host ""
+-    Write-Host "  📱 iPhone Configuration:" -ForegroundColor White
+-    Write-Host "     Install: ios/modified_debs/iosvcam_base_127_10_10_10.deb" -ForegroundColor Gray
+-    Write-Host "     RTMP URL: rtmp://127.10.10.10:1935/live/srs" -ForegroundColor Cyan
++    Write-Host "  📱 iPhone Setup:" -ForegroundColor White
++    Write-Host "     1. Install: ios/modified_debs/iosvcam_base_127_10_10_10.deb" -ForegroundColor Gray
++    Write-Host "     2. Connect via USB cable" -ForegroundColor Gray
++    Write-Host "     3. Open iOS-VCAM app and tap Connect" -ForegroundColor Gray
++    Write-Host ""
++    Write-Host "  🎬 OBS/Streaming Software:" -ForegroundColor White
++    Write-Host "     RTMP URL: rtmp://localhost:1935/live/srs" -ForegroundColor Cyan
+     Write-Host ""
+     Write-Host "  ⚠️  FIRST TIME: Accept SSH host key in yellow window (type 'y')" -ForegroundColor Yellow
+-    Write-Host "      Password is auto-provided from saved config" -ForegroundColor Gray
+     Write-Host ""
+     Write-Host "  🌐 Monibuca Console: http://localhost:8081/" -ForegroundColor Cyan
+     Write-Host ""
++    Write-Host "  📝 Log file: $script:UsbLogFile" -ForegroundColor Gray
++    Write-Host ""
+     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
+     Write-Host ""
+     Read-Host "Press Enter to return to menu..."
+ }
+ 

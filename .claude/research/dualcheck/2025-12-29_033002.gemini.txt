@@ -1,0 +1,65 @@
+YOLO mode is enabled. All tool calls will be automatically approved.
+Session cleanup disabled: Either maxAge or maxCount must be specified
+Loaded cached credentials.
+Loading extension: chime
+Loading extension: chrome-devtools-mcp
+Loading extension: code-review
+Loading extension: criticalthink
+Loading extension: extension-browser
+Loading extension: gemini-cli-prompt-library
+Loading extension: genkit
+Loading extension: google-fonts
+Loading extension: nanobanana
+Server 'chime-notification-server' supports tool updates. Listening for changes...
+Server 'extension-browser-server' supports tool updates. Listening for changes...
+Server 'google-fonts-local-mcp' supports tool updates. Listening for changes...
+Server 'chrome-devtools' supports tool updates. Listening for changes...
+Server 'genkit' supports tool updates. Listening for changes...
+```json
+[
+  {
+    "severity": "MEDIUM",
+    "title": "Recursive call in 'Status' menu option can lead to stack overflow",
+    "details": "In the `Start-MonibucaViaSshUsb` function, selecting the 'S' (Status) option calls `Start-MonibucaViaSshUsb` recursively after displaying process status. Repeated selection of 'S' will increase the call stack indefinitely, potentially leading to a stack overflow.",
+    "file": "iOS-VCAM-Launcher.ps1",
+    "line": "1431",
+    "recommendation": "Replace the recursive call to `Start-MonibucaViaSshUsb` within the 'S' option of the `switch` statement with a loop that redisplays the menu or returns to the main menu function, avoiding deep recursion."
+  },
+  {
+    "severity": "MEDIUM",
+    "title": "Incomplete process health verification for launched services",
+    "details": "The script primarily relies on `Start-Sleep` and basic `Get-NetTCPConnection` checks to verify service startup for Flask and Monibuca. While the check for Flask on port 80 is improved (filtering by 'python|flask' process name), it does not verify if the application itself is truly healthy and responsive (e.g., via an HTTP GET to a Flask health endpoint or a Monibuca API check). For the SSH tunnel, success is only inferred after a `Start-Sleep` without explicit error capture from `plink`.",
+    "file": "iOS-VCAM-Launcher.ps1",
+    "line": "1709-1725, 1756-1772, 1928-1930",
+    "recommendation": "Implement more robust health checks, such as making an HTTP GET request to a Flask health endpoint (e.g., `Invoke-WebRequest -Uri http://localhost/health -ErrorAction SilentlyContinue`), or probing Monibuca's RTMP/HTTP endpoint with a client. For `plink`, capture its standard error and check its exit code to confirm successful tunnel establishment."
+  },
+  {
+    "severity": "LOW",
+    "title": "Reliance on 'python' being in system PATH or implicitly available",
+    "details": "The Flask server is launched using `& python server.py`. This assumes that the `python` executable is available in the system's PATH environment variable or implicitly available in the current working directory after `Set-Location`. If multiple Python versions are installed or if `python` is not in PATH, this could lead to failures or unexpected behavior.",
+    "file": "iOS-VCAM-Launcher.ps1",
+    "line": "1746",
+    "recommendation": "To ensure reliability, specify the full path to the intended Python executable (if it's bundled with the application) or add explicit logic to discover the Python interpreter if it's expected to be external."
+  },
+  {
+    "severity": "LOW",
+    "title": "Security trade-off: SSH `-batch` mode auto-accepts host keys without user verification",
+    "details": "The `plink` command uses the `-batch` flag, which prevents user interaction and automatically accepts new SSH host keys without verification. While this improves user experience for non-interactive scripting, in a general SSH context, it bypasses security warnings for unknown hosts and could potentially make the system vulnerable to Man-in-the-Middle (MITM) attacks. Given `plink` connects to `localhost` (via `iproxy` to the iPhone), the MITM risk is significantly reduced, but it's a security trade-off for convenience.",
+    "file": "iOS-VCAM-Launcher.ps1",
+    "line": "1916",
+    "recommendation": "For this specific use case, the risk is low. However, for any future SSH usage or if the target changes, consider explicit host key management (e.g., pre-populating `known_hosts` or verifying a trusted fingerprint) as a stronger security practice. It might be beneficial to include a note in the documentation about this behavior."
+  },
+  {
+    "severity": "LOW",
+    "title": "Missing explicit error capture for SSH tunnel (plink) execution",
+    "details": "The `plink` process is launched as a background PowerShell process, but its standard error stream is not captured, nor is its exit code explicitly checked by the parent PowerShell script. Failures during the SSH connection or tunnel setup (e.g., authentication issues, network problems) might only be observable in the hidden child process's console or indirectly through system logs, making diagnosis difficult.",
+    "file": "iOS-VCAM-Launcher.ps1",
+    "line": "1916",
+    "recommendation": "Consider redirecting `plink`'s stderr to a log file for later inspection and checking the exit code of the `Start-Process` result or using `Wait-Process` with a timeout to verify `plink`'s successful startup and operation."
+  }
+]
+```
+
+The updated PowerShell script introduces a new sub-menu for USB streaming management, enhancing usability with options to stop processes and check their status. It successfully addresses a critical bug by correctly enabling variable expansion within PowerShell here-strings for `iproxy` and `plink` commands, which previously caused them to fail. Additionally, background services (`iproxy`, `Flask`, `plink`) now run in hidden windows, providing a cleaner user experience.
+
+However, a minor bug exists where repeatedly selecting the 'Status' menu option can lead to infinite recursion. Further improvements could also be made to fully verify the health and responsiveness of all launched services (Flask, Monibuca, SSH tunnel) rather than relying on basic process and port checks. Finally, explicit error capture for the `plink` SSH tunnel execution would improve diagnostic capabilities, and the reliance on a global `python` executable could be made more robust.

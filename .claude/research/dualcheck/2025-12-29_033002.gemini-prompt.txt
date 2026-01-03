@@ -1,0 +1,623 @@
+You are reviewing PowerShell code changes for an iOS VCAM streaming launcher.
+
+Review for: (1) security issues, (2) PowerShell best practices 2025, (3) performance pitfalls, (4) Windows compatibility, (5) error handling completeness.
+
+OUTPUT REQUIREMENTS:
+1) Start with a JSON array in a single fenced block (```json). Each item: {severity: 'CRITICAL|HIGH|MEDIUM|LOW', title, details, file, line, recommendation}.
+2) Then provide a short human summary.
+
+INPUT (diff):
+
+diff --git a/.claude/research/dualcheck/2025-12-28_215704.gemini.txt b/.claude/research/dualcheck/2025-12-28_215704.gemini.txt
+new file mode 100644
+index 0000000..42f4a49
+--- /dev/null
++++ b/.claude/research/dualcheck/2025-12-28_215704.gemini.txt
+@@ -0,0 +1,20 @@
++YOLO mode is enabled. All tool calls will be automatically approved.
++Session cleanup disabled: Either maxAge or maxCount must be specified
++Loaded cached credentials.
++Loading extension: chime
++Loading extension: chrome-devtools-mcp
++Loading extension: code-review
++Loading extension: criticalthink
++Loading extension: extension-browser
++Loading extension: gemini-cli-prompt-library
++Loading extension: genkit
++Loading extension: google-fonts
++Loading extension: nanobanana
++Server 'chime-notification-server' supports tool updates. Listening for changes...
++Server 'extension-browser-server' supports tool updates. Listening for changes...
++Server 'google-fonts-local-mcp' supports tool updates. Listening for changes...
++Server 'chrome-devtools' supports tool updates. Listening for changes...
++Server 'genkit' supports tool updates. Listening for changes...
++Error when talking to Gemini API Full report available at: C:\Users\d0nbxx\AppData\Local\Temp\gemini-client-error-Turn.run-sendMessageStream-2025-12-29T06-03-26-032Z.json
++[API Error: Requested entity was not found.]
++An unexpected critical error occurred:[object Object]
+diff --git a/.claude/research/dualcheck/2025-12-29_010838.report.md b/.claude/research/dualcheck/2025-12-29_010838.report.md
+new file mode 100644
+index 0000000..f55e6e3
+--- /dev/null
++++ b/.claude/research/dualcheck/2025-12-29_010838.report.md
+@@ -0,0 +1,39 @@
++# Dualcheck Report - USB Streaming Changes
++
++**Date:** 2025-12-29 01:08:38
++**Diff:** 547 lines in iOS-VCAM-Launcher.ps1
++
++## Gemini Review
++
++### Issues Found
++
++| Severity | Issue | Status |
++|----------|-------|--------|
++| CRITICAL | `root @localhost` space in plink command | FALSE POSITIVE - actual code has `root@localhost` |
++| HIGH | Port 80 false positive with System/IIS | FIXED - now checks process name is python |
++| MEDIUM | Path injection in `Set-Location` | LOW RISK - project path has no special chars |
++| MEDIUM | root vs mobile SSH user | INFORMATIONAL - documented behavior |
++| LOW | GatewayPorts SSH config assumption | EXPECTED - 127.10.10.10 alias handles this |
++
++### Fix Applied
++
++Added verification that port 80 is held by Python, not System/IIS (PID 4):
++```powershell
++if ($port80Proc -and $port80Proc.ProcessName -match 'python|flask') {
++    Write-Host "  ✅ Flask listening on port 80" -ForegroundColor Green
++} elseif ($flaskCheck.OwningProcess -eq 4) {
++    Write-Host "  ❌ Port 80 held by System/IIS (PID 4)!" -ForegroundColor Red
++    Write-Host "     Stop IIS: Stop-Service W3SVC -Force" -ForegroundColor Gray
++    $allReady = $false
++}
++```
++
++## Codex Review
++
++Unable to run (stdin not supported).
++
++## Summary
++
++- 1 real issue found and fixed (port 80 false positive detection)
++- 1 false positive from Gemini (SSH syntax was correct)
++- 3 informational/low-risk items noted
+diff --git a/.claude/research/dualcheck/2025-12-29_021447.codex.txt b/.claude/research/dualcheck/2025-12-29_021447.codex.txt
+new file mode 100644
+index 0000000..b26126d
+--- /dev/null
++++ b/.claude/research/dualcheck/2025-12-29_021447.codex.txt
+@@ -0,0 +1,78 @@
++```json
++[
++  {
++    "severity": "HIGH",
++    "title": "Here-strings appear single-quoted, preventing variable expansion",
++    "details": "If the commands shown live inside a single-quoted here-string (@' ... '@), PowerShell will not expand $script:SRSHome, $monibucaPath, $configFullPath, or $plinkPath. The executed commands will literally include '$script:SRSHome' and '$monibucaPath', causing Set-Location and the executable invocations to fail.",
++    "file": "unknown",
++    "line": "unknown",
++    "recommendation": "Use a double-quoted here-string (@\" ... \"@) or build the script text with interpolated variables before passing it to SSH/Invoke-Expression. Verify variables by echoing the resolved command string before execution."
++  },
++  {
++    "severity": "HIGH",
++    "title": "Set-Location path is quoted as a literal string",
++    "details": "Set-Location '$script:SRSHome' uses single quotes, so even outside a here-string, it treats the path as a literal string. That will not resolve to the intended directory and will fail unless a directory literally named $script:SRSHome exists.",
++    "file": "unknown",
++    "line": "unknown",
++    "recommendation": "Use Set-Location $script:SRSHome (no quotes) or Set-Location \"$script:SRSHome\" (double quotes)."
++  },
++  {
++    "severity": "HIGH",
++    "title": "Executable paths are quoted as literals, so processes may not start",
++    "details": "The Monibuca and plink invocations use '& '$monibucaPath'' and '& '$plinkPath''. Single quotes prevent variable expansion; the call operator receives a literal string '$monibucaPath' or '$plinkPath', so the executable is not found.",
++    "file": "unknown",
++    "line": "unknown",
++    "recommendation": "Use & $monibucaPath and & $plinkPath (or double-quoted if needed)."
++  },
++  {
++    "severity": "MEDIUM",
++    "title": "Config path passed to Monibuca is literal",
++    "details": "The -c '$configFullPath' argument will be the literal text $configFullPath instead of the actual path if single-quoted or inside a single-quoted here-string.",
++    "file": "unknown",
++    "line": "unknown",
++    "recommendation": "Pass -c $configFullPath or -c \"$configFullPath\"."
++  },
++  {
++    "severity": "MEDIUM",
++    "title": "Logic does not verify Flask/Monibuca actually started",
++    "details": "Even with correct expansion, the snippet does not check process exit codes, listen ports, or health endpoints. Failures (missing python, port 80 in use, bad config) can be silent.",
++    "file": "unknown",
++    "line": "unknown",
++    "recommendation": "Capture $LASTEXITCODE, check process objects, and probe ports (e.g., Test-NetConnection) with retries before continuing."
++  },
++  {
++    "severity": "MEDIUM",
++    "title": "Potential port binding and privilege issues for Flask on port 80",
++    "details": "Binding to port 80 may require elevation; in a restricted environment Flask may fail immediately. If started via SSH with no PTY, failures may be swallowed without checks.",
++    "file": "unknown",
++    "line": "unknown",
++    "recommendation": "Add explicit error handling and fallback port or pre-flight privilege/port checks."
++  },
++  {
++    "severity": "MEDIUM",
++    "title": "Race condition: SSH tunnel may start before Flask is listening",
++    "details": "If the tunnel is created immediately after launching Flask, there is a window where the remote side connects but localhost:80 is not yet accepting connections, leading to failed pairing/RTMP flows.",
++    "file": "unknown",
++    "line": "unknown",
++    "recommendation": "Add a wait loop for Flask readiness (TCP connect or HTTP health check) before opening the tunnel."
++  },
++  {
++    "severity": "LOW",
++    "title": "Race condition: Monibuca may depend on working directory or config availability",
++    "details": "If Set-Location fails due to quoting issues, Monibuca may run in an unexpected directory and fail to resolve relative paths or config includes.",
++    "file": "unknown",
++    "line": "unknown",
++    "recommendation": "Ensure Set-Location succeeds and use full paths; verify config file exists before launch."
++  },
++  {
++    "severity": "LOW",
++    "title": "Error handling incomplete around SSH/plink execution",
++    "details": "The SSH command uses -batch but no retries/backoff and no capture of stderr; failures (auth, network) may be missed.",
++    "file": "unknown",
++    "line": "unknown",
++    "recommendation": "Capture output, check $LASTEXITCODE, and implement retry logic with timeouts."
++  }
++]
++```
++
++Summary: The likely root cause is single-quoted here-strings or single quotes around variables, which prevents expansion and causes Set-Location and executable invocations to use literal strings. As written, Flask/Monibuca/plink may not start at all. Even after fixing expansion, add explicit readiness checks and exit-code handling to avoid silent failures and race conditions.
+diff --git a/USB-STREAMING-WORKING.md b/USB-STREAMING-WORKING.md
+index 2116b53..8158806 100644
+--- a/USB-STREAMING-WORKING.md
++++ b/USB-STREAMING-WORKING.md
+@@ -8,12 +8,17 @@
+ 
+ ## Quick Start
+ 
+ 1. **Run launcher as Administrator**
+ 2. **Select Option [U]** - USB Streaming via SSH Tunnel
+-3. **In OBS:** Stream to `rtmp://localhost:1935/live/srs`
+-4. **On iPhone:** Open iOS-VCAM app → receives the OBS stream as virtual camera
++3. **Sub-menu options:**
++   - `[1]` Start USB Streaming (default)
++   - `[K]` Kill All Processes & Restart Fresh
++   - `[S]` Status - Show Running Processes
++   - `[Q]` Back to Main Menu
++4. **In OBS:** Stream to `rtmp://localhost:1935/live/srs`
++5. **On iPhone:** Open iOS-VCAM app → receives the OBS stream as virtual camera
+ 
+ ---
+ 
+ ## Architecture Overview
+ 
+@@ -182,13 +187,18 @@ netstat -an | grep 127.10.10.10
+ ### Tunnel Dies Immediately
+ - **Cause:** plink needs a running command to keep session alive
+ - **Fix:** Command must include keep-alive like `'echo TUNNEL_ACTIVE; cat'`
+ 
+ ### "Connection Reset" Errors
+-- Kill all existing iproxy/plink processes and restart
++- Use **Option [K]** in the USB streaming menu to kill all processes and restart fresh
+ - Ensure iPhone is unlocked and USB is connected
+ 
++### Stream Not Flowing / Clogged
++- Use **Option [K]** to kill all processes and restart fresh
++- Use **Option [S]** to check which processes are running
++- Restart OBS and re-connect the stream
++
+ ---
+ 
+ ## Bug Fix History (2025-12-29)
+ 
+ ### PowerShell Here-String Variable Expansion Bug
+diff --git a/docs/Troubleshooting.md b/docs/Troubleshooting.md
+index eb75fee..3aaade6 100644
+--- a/docs/Troubleshooting.md
++++ b/docs/Troubleshooting.md
+@@ -48,11 +48,11 @@
+ 
+ ## 🛠 Launcher Issues
+ 
+ ### "PowerShell Parser Error" (Crash on Start)
+ *   **Status:** Fixed in v3.2.1.
+-*   **Fix:** If using an outdated version, update to v3.2.1+. Use the latest `iOS-VCAM-Launcher.exe`.
++*   **Fix:** If using an old version, update to v3.2.1+. Use the latest `iOS-VCAM-Launcher.exe`.
+ 
+ ### "Port 1935 in use"
+ *   **Cause:** Another instance of SRS or another server is running.
+ *   **Fix:**
+     *   Use **Option [5]** (Port Cleanup) in the Launcher.
+diff --git a/iOS-VCAM-Launcher.exe b/iOS-VCAM-Launcher.exe
+index d3a3274..c57d7fe 100644
+Binary files a/iOS-VCAM-Launcher.exe and b/iOS-VCAM-Launcher.exe differ
+diff --git a/iOS-VCAM-Launcher.ps1 b/iOS-VCAM-Launcher.ps1
+index 8ffd6dc..2189684 100644
+--- a/iOS-VCAM-Launcher.ps1
++++ b/iOS-VCAM-Launcher.ps1
+@@ -1307,10 +1307,118 @@ function Update-MonibucaConfigIP {
+         Write-Host "  ⚠️ Could not update Monibuca config IP: $_" -ForegroundColor Yellow
+         return $false
+     }
+ }
+ 
++function Stop-UsbStreamingProcesses {
++    <#
++    .SYNOPSIS
++        Stops all USB streaming related processes for a clean restart.
++    .DESCRIPTION
++        Kills iproxy, plink, Flask (python), and Monibuca processes
++        that were started by the USB streaming function.
++    #>
++    param(
++        [switch]$Silent
++    )
++
++    if (-not $Silent) {
++        Write-Host ""
++        Write-Host "  🧹 Stopping all USB streaming processes..." -ForegroundColor Yellow
++    }
++
++    $processesKilled = 0
++
++    # Kill iproxy processes
++    $iproxyProcs = Get-Process -Name "iproxy" -ErrorAction SilentlyContinue
++    if ($iproxyProcs) {
++        foreach ($proc in $iproxyProcs) {
++            try {
++                if (-not $Silent) { Write-Host "  🔥 Stopping iproxy (PID: $($proc.Id))" -ForegroundColor Red }
++                Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
++                $processesKilled++
++            } catch { }
++        }
++    }
++
++    # Kill plink processes
++    $plinkProcs = Get-Process -Name "plink" -ErrorAction SilentlyContinue
++    if ($plinkProcs) {
++        foreach ($proc in $plinkProcs) {
++            try {
++                if (-not $Silent) { Write-Host "  🔥 Stopping plink SSH tunnel (PID: $($proc.Id))" -ForegroundColor Red }
++                Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
++                $processesKilled++
++            } catch { }
++        }
++    }
++
++    # Kill Monibuca processes
++    $monibucaProcs = Get-Process -Name "monibuca" -ErrorAction SilentlyContinue
++    if ($monibucaProcs) {
++        foreach ($proc in $monibucaProcs) {
++            try {
++                if (-not $Silent) { Write-Host "  🔥 Stopping Monibuca (PID: $($proc.Id))" -ForegroundColor Red }
++                Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
++                $processesKilled++
++            } catch { }
++        }
++    }
++
++    # Kill Flask processes on ports 80 and 5000 (Flask default)
++    foreach ($port in @(80, 5000)) {
++        try {
++            $connections = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
++            if ($connections) {
++                foreach ($conn in $connections) {
++                    $proc = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
++                    if ($proc -and $proc.ProcessName -eq "python") {
++                        try {
++                            if (-not $Silent) { Write-Host "  🔥 Stopping Flask/Python on port $port (PID: $($proc.Id))" -ForegroundColor Red }
++                            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
++                            $processesKilled++
++                        } catch { }
++                    }
++                }
++            }
++        } catch { }
++    }
++
++    # Also kill any Python processes on port 1935 (RTMP)
++    try {
++        $connections = Get-NetTCPConnection -LocalPort 1935 -ErrorAction SilentlyContinue
++        if ($connections) {
++            foreach ($conn in $connections) {
++                $proc = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
++                if ($proc) {
++                    try {
++                        if (-not $Silent) { Write-Host "  🔥 Stopping process on port 1935: $($proc.ProcessName) (PID: $($proc.Id))" -ForegroundColor Red }
++                        Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
++                        $processesKilled++
++                    } catch { }
++                }
++            }
++        }
++    } catch { }
++
++    # Wait for processes to fully terminate
++    if ($processesKilled -gt 0) {
++        Start-Sleep -Seconds 2
++    }
++
++    if (-not $Silent) {
++        if ($processesKilled -gt 0) {
++            Write-Host "  ✅ Cleanup complete - stopped $processesKilled process(es)" -ForegroundColor Green
++        } else {
++            Write-Host "  ✅ No USB streaming processes were running" -ForegroundColor Green
++        }
++        Write-Host ""
++    }
++
++    return $processesKilled
++}
++
+ function Start-MonibucaViaSshUsb {
+     <#
+     .SYNOPSIS
+         Starts complete USB streaming solution with Flask auth + Monibuca via SSH tunnels.
+     .DESCRIPTION
+@@ -1329,10 +1437,111 @@ function Start-MonibucaViaSshUsb {
+     Write-Host "    =====================================================================================" -ForegroundColor Magenta
+     Write-Host "                      🔌 USB STREAMING VIA SSH REVERSE TUNNEL                           " -ForegroundColor White
+     Write-Host "    =====================================================================================" -ForegroundColor Magenta
+     Write-Host ""
+ 
++    # Quick device scan for menu display
++    $ideviceIdPath = "C:\iProxy\idevice_id.exe"
++    $quickDevices = @()
++    try {
++        $quickScan = & $ideviceIdPath -l 2>&1
++        if ($quickScan -and $LASTEXITCODE -eq 0) {
++            $quickDevices = @($quickScan -split "`r`n|`n|`r" | ForEach-Object { $_.Trim() } | Where-Object { $_ -match "^[a-fA-F0-9\-]+$" })
++        }
++    } catch { }
++    $deviceCount = $quickDevices.Count
++    $deviceStatus = if ($deviceCount -eq 0) { "❌ No device" } elseif ($deviceCount -eq 1) { "📱 1 device" } else { "📱 $deviceCount devices" }
++
++    # Show sub-menu for USB streaming options
++    Write-Host "  Options:                              $deviceStatus" -ForegroundColor Cyan
++    Write-Host "     [1] Start USB Streaming (default)" -ForegroundColor White
++    Write-Host "     [K] Kill All Processes & Restart Fresh" -ForegroundColor Yellow
++    Write-Host "     [S] Status - Show Running Processes" -ForegroundColor Gray
++    Write-Host "     [Q] Back to Main Menu" -ForegroundColor Gray
++    Write-Host ""
++    $usbChoice = Read-Host "     Select option (1/K/S/Q) [1]"
++    if ([string]::IsNullOrWhiteSpace($usbChoice)) { $usbChoice = "1" }
++    $usbChoice = $usbChoice.ToUpper().Trim()
++
++    switch ($usbChoice) {
++        "Q" {
++            return
++        }
++        "K" {
++            Write-Host ""
++            Stop-UsbStreamingProcesses
++            Write-Host "  🔄 Restarting USB streaming..." -ForegroundColor Cyan
++            Write-Host ""
++            Start-Sleep -Seconds 1
++            # Continue to start fresh
++        }
++        "S" {
++            Write-Host ""
++            Write-Host "  📊 USB Streaming Process Status:" -ForegroundColor Cyan
++            Write-Host ""
++
++            # Check iproxy
++            $iproxyProcs = Get-Process -Name "iproxy" -ErrorAction SilentlyContinue
++            if ($iproxyProcs) {
++                Write-Host "  ✅ iproxy: Running (PIDs: $($iproxyProcs.Id -join ', '))" -ForegroundColor Green
++            } else {
++                Write-Host "  ⬚  iproxy: Not running" -ForegroundColor Gray
++            }
++
++            # Check plink
++            $plinkProcs = Get-Process -Name "plink" -ErrorAction SilentlyContinue
++            if ($plinkProcs) {
++                Write-Host "  ✅ plink: Running (PIDs: $($plinkProcs.Id -join ', '))" -ForegroundColor Green
++            } else {
++                Write-Host "  ⬚  plink: Not running" -ForegroundColor Gray
++            }
++
++            # Check Monibuca
++            $monibucaProcs = Get-Process -Name "monibuca" -ErrorAction SilentlyContinue
++            if ($monibucaProcs) {
++                Write-Host "  ✅ Monibuca: Running (PIDs: $($monibucaProcs.Id -join ', '))" -ForegroundColor Green
++            } else {
++                Write-Host "  ⬚  Monibuca: Not running" -ForegroundColor Gray
++            }
++
++            # Check Flask on port 80
++            try {
++                $flask80 = Get-NetTCPConnection -LocalPort 80 -ErrorAction SilentlyContinue
++                if ($flask80) {
++                    $proc = Get-Process -Id $flask80[0].OwningProcess -ErrorAction SilentlyContinue
++                    Write-Host "  ✅ Port 80: $($proc.ProcessName) (PID: $($flask80[0].OwningProcess))" -ForegroundColor Green
++                } else {
++                    Write-Host "  ⬚  Port 80: Not in use" -ForegroundColor Gray
++                }
++            } catch {
++                Write-Host "  ⬚  Port 80: Could not check" -ForegroundColor Gray
++            }
++
++            # Check RTMP port 1935
++            try {
++                $rtmp = Get-NetTCPConnection -LocalPort 1935 -ErrorAction SilentlyContinue
++                if ($rtmp) {
++                    $proc = Get-Process -Id $rtmp[0].OwningProcess -ErrorAction SilentlyContinue
++                    Write-Host "  ✅ Port 1935: $($proc.ProcessName) (PID: $($rtmp[0].OwningProcess))" -ForegroundColor Green
++                } else {
++                    Write-Host "  ⬚  Port 1935: Not in use" -ForegroundColor Gray
++                }
++            } catch {
++                Write-Host "  ⬚  Port 1935: Could not check" -ForegroundColor Gray
++            }
++
++            Write-Host ""
++            Read-Host "Press Enter to continue..."
++            # Recurse back to show menu again
++            Start-MonibucaViaSshUsb
++            return
++        }
++        default {
++            # Default is "1" - continue to start streaming
++        }
++    }
++
+     # Track verification results for conditional READY banner
+     $allReady = $true
+ 
+     Write-Host "[INFO] Preparing complete USB streaming solution..." -ForegroundColor Green
+     Write-Host "       Flask (HTTP auth) + Monibuca (RTMP) + Dual SSH tunnels" -ForegroundColor Gray
+@@ -1683,33 +1892,20 @@ function Start-MonibucaViaSshUsb {
+     }
+     Write-Host "  ✅ Using config: $(Split-Path $configPath -Leaf)" -ForegroundColor Green
+     Write-Host ""
+ 
+     # ============================================================================
+-    # STEP 6: Launch iproxy (USB SSH forwarding)
++    # STEP 6: Launch iproxy (USB SSH forwarding) - HIDDEN
+     # ============================================================================
+     Write-Host "[STEP 6/9] 🚀 Starting iproxy (USB → SSH forwarding)..." -ForegroundColor Yellow
+ 
++    # Run iproxy hidden - it just forwards ports, no user interaction needed
+     $iproxyCommand = @"
+-`$Host.UI.RawUI.WindowTitle = 'iProxy - USB SSH$deviceFriendlyName';
+-Write-Host '========================================' -ForegroundColor Cyan;
+-Write-Host '    iProxy USB Port Forwarding         ' -ForegroundColor White;
+-Write-Host '========================================' -ForegroundColor Cyan;
+-Write-Host '';
+-Write-Host 'Forwarding: localhost:2222 -> iPhone:22' -ForegroundColor Yellow;
+-Write-Host 'Device: $selectedUDID$deviceFriendlyName' -ForegroundColor Gray;
+-Write-Host '';
+-Write-Host 'Keep this window open!' -ForegroundColor Green;
+-Write-Host '========================================' -ForegroundColor Cyan;
+-Write-Host '';
+-& '$iproxyPath' 2222 22 '$selectedUDID';
+-Write-Host '';
+-Write-Host 'iProxy stopped. Press any key to close...' -ForegroundColor Yellow;
+-`$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
++& "$iproxyPath" 2222 22 "$selectedUDID"
+ "@
+ 
+-    Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $iproxyCommand -WindowStyle Normal
++    Start-Process powershell -ArgumentList "-ExecutionPolicy", "Bypass", "-Command", $iproxyCommand -WindowStyle Hidden
+ 
+     # Wait for iproxy process to start (USB forwarding doesn't show as TCP listener)
+     $timeout = 10
+     $startTime = Get-Date
+     $iproxyProc = $null
+@@ -1731,32 +1927,17 @@ Write-Host 'iProxy stopped. Press any key to close...' -ForegroundColor Yellow;
+     # ============================================================================
+     # STEP 7: Launch Flask auth server (port 80)
+     # ============================================================================
+     Write-Host "[STEP 7/9] 🌐 Starting Flask auth server (port 80)..." -ForegroundColor Yellow
+ 
++    # Run Flask hidden - just serves HTTP auth, no user interaction needed
+     $flaskCommand = @"
+-`$Host.UI.RawUI.WindowTitle = 'Flask - HTTP Auth Server';
+-Write-Host '========================================' -ForegroundColor Blue;
+-Write-Host '    Flask HTTP Authentication Server   ' -ForegroundColor White;
+-Write-Host '========================================' -ForegroundColor Blue;
+-Write-Host '';
+-Write-Host 'Listening on: http://0.0.0.0:80/' -ForegroundColor Green;
+-Write-Host 'iPhone auth endpoint: http://127.10.10.10/I' -ForegroundColor Cyan;
+-Write-Host '';
+-Write-Host 'This handles iOS app authentication' -ForegroundColor Gray;
+-Write-Host 'before RTMP streaming can begin.' -ForegroundColor Gray;
+-Write-Host '';
+-Write-Host '========================================' -ForegroundColor Blue;
+-Write-Host '';
+ Set-Location "$script:SRSHome";
+-& python server.py --host 0.0.0.0 --port 80;
+-Write-Host '';
+-Write-Host 'Flask stopped. Press any key to close...' -ForegroundColor Yellow;
+-`$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
++& python server.py --host 0.0.0.0 --port 80
+ "@
+ 
+-    Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $flaskCommand -WindowStyle Normal
++    Start-Process powershell -ArgumentList "-ExecutionPolicy", "Bypass", "-Command", $flaskCommand -WindowStyle Hidden
+ 
+     # Give Flask time to initialize Python environment
+     Start-Sleep -Seconds 3
+ 
+     # Wait for Flask to start listening on port 80
+@@ -1885,25 +2066,15 @@ Write-Host 'Monibuca stopped. Press any key to close...' -ForegroundColor Yellow
+     # Start SSH tunnel with -batch mode and a keep-alive command (tunnel dies without a command!)
+     Write-Host "  🔗 Starting SSH reverse tunnel..." -ForegroundColor Gray
+ 
+     # CRITICAL: plink MUST use -batch AND have a running command or the tunnel won't bind ports!
+     # Using 'cat' as keep-alive - it waits forever for input that never comes
++    # -batch auto-accepts host keys so it works with different phones without user interaction
+     $tunnelCommand = @"
+-`$Host.UI.RawUI.WindowTitle = 'SSH Tunnel - KEEP OPEN';
+-Write-Host '========================================' -ForegroundColor Yellow;
+-Write-Host '  SSH REVERSE TUNNEL - KEEP THIS OPEN  ' -ForegroundColor White;
+-Write-Host '========================================' -ForegroundColor Yellow;
+-Write-Host '';
+-Write-Host 'Tunneling ports 80 + 1935 to iPhone' -ForegroundColor Cyan;
+-Write-Host 'If you close this window, streaming stops!' -ForegroundColor Red;
+-Write-Host '';
+-& "$plinkPath" -ssh -batch -R 127.10.10.10:80:localhost:80 -R 127.10.10.10:1935:localhost:1935 -pw $sshPassword root@localhost -P 2222 'echo TUNNEL_ACTIVE; cat';
+-Write-Host '';
+-Write-Host 'SSH Tunnel disconnected. Press any key...' -ForegroundColor Yellow;
+-`$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
++& "$plinkPath" -ssh -batch -R 127.10.10.10:80:localhost:80 -R 127.10.10.10:1935:localhost:1935 -pw $sshPassword root@localhost -P 2222 'echo TUNNEL_ACTIVE; cat'
+ "@
+-    Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $tunnelCommand -WindowStyle Normal
++    Start-Process powershell -ArgumentList "-ExecutionPolicy", "Bypass", "-Command", $tunnelCommand -WindowStyle Hidden
+ 
+     # Give SSH time to connect and set up tunnels
+     Write-Host "  ⏳ Waiting for SSH connection..." -ForegroundColor Gray
+     Start-Sleep -Seconds 5
+ 
+@@ -1933,29 +2104,28 @@ Write-Host 'SSH Tunnel disconnected. Press any key...' -ForegroundColor Yellow;
+         Write-Host "              ⚠️ USB STREAMING STARTED WITH WARNINGS                        " -BackgroundColor DarkYellow -ForegroundColor Black
+         Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Yellow
+         Add-Content -Path $script:UsbLogFile -Value "[$(Get-Date -Format 'HH:mm:ss')] FINAL: STARTED WITH WARNINGS - check log for details"
+     }
+     Write-Host ""
+-    Write-Host "  🔌 Four windows launched:" -ForegroundColor White
+-    Write-Host "     1. iProxy (Cyan)        - USB port forwarding" -ForegroundColor Cyan
+-    Write-Host "     2. Flask (Blue)         - HTTP auth server (port 80)" -ForegroundColor Blue
+-    Write-Host "     3. Monibuca (Magenta)   - RTMP streaming server (port 1935)" -ForegroundColor Magenta
+-    Write-Host "     4. SSH Tunnels (Yellow) - Reverse tunnels to iPhone" -ForegroundColor Yellow
+-    Write-Host ""
+-    Write-Host "  📱 iPhone Setup:" -ForegroundColor White
+-    Write-Host "     1. Install: ios/modified_debs/iosvcam_base_127_10_10_10.deb" -ForegroundColor Gray
+-    Write-Host "     2. Connect via USB cable" -ForegroundColor Gray
+-    Write-Host "     3. Open iOS-VCAM app and tap Connect" -ForegroundColor Gray
++    Write-Host "  🔌 Services running:" -ForegroundColor White
++    Write-Host "     ✅ iProxy      (background) - USB port forwarding" -ForegroundColor Gray
++    Write-Host "     ✅ Flask       (background) - HTTP auth on port 80" -ForegroundColor Gray
++    Write-Host "     ✅ SSH Tunnel  (background) - Reverse tunnels to iPhone" -ForegroundColor Gray
++    Write-Host "     📺 Monibuca   (visible)    - RTMP streaming on port 1935" -ForegroundColor Magenta
+     Write-Host ""
+-    Write-Host "  🎬 OBS/Streaming Software:" -ForegroundColor White
+-    Write-Host "     RTMP URL: rtmp://localhost:1935/live/srs" -ForegroundColor Cyan
++    Write-Host "  🎬 OBS Stream Settings:" -ForegroundColor White
++    Write-Host "     Server: rtmp://localhost:1935/live" -ForegroundColor Cyan
++    Write-Host "     Stream Key: srs" -ForegroundColor Cyan
+     Write-Host ""
+-    Write-Host "  ⚠️  FIRST TIME: Accept SSH host key in yellow window (type 'y')" -ForegroundColor Yellow
++    Write-Host "  📱 iPhone App (PULLS stream via tunnel):" -ForegroundColor White
++    Write-Host "     Uses: rtmp://127.10.10.10:1935/live/srs" -ForegroundColor Green
++    Write-Host "     Open iOS-VCAM app and tap Connect" -ForegroundColor Gray
+     Write-Host ""
+     Write-Host "  🌐 Monibuca Console: http://localhost:8081/" -ForegroundColor Cyan
+     Write-Host ""
+-    Write-Host "  📝 Log file: $script:UsbLogFile" -ForegroundColor Gray
++    Write-Host "  💡 Use Option [K] from menu to kill all & restart fresh" -ForegroundColor Yellow
++    Write-Host "  📝 Log: $script:UsbLogFile" -ForegroundColor Gray
+     Write-Host ""
+     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
+     Write-Host ""
+     Read-Host "Press Enter to return to menu..."
+ }
+diff --git a/iOS-VCAM-Launcher4.2.exe b/iOS-VCAM-Launcher4.2.exe
+new file mode 100644
+index 0000000..c57d7fe
+Binary files /dev/null and b/iOS-VCAM-Launcher4.2.exe differ
+diff --git a/shutdown.bat b/shutdown.bat
+index 21bd4df..a710b1a 100644
+--- a/shutdown.bat
++++ b/shutdown.bat
+@@ -1 +1 @@
+-taskkill /pid 58364  -t  -f
+\ No newline at end of file
++taskkill /pid 86740  -t  -f
+\ No newline at end of file
